@@ -482,17 +482,135 @@ def _round_rect(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float,
 	return canvas.create_polygon(points, smooth=True, **kwargs)
 
 
-def _card(parent: tk.Misc, padx: int = CARD_PAD, pady: int = CARD_PAD) -> tk.Frame:
-	"""A flat panel with a hairline border, the window's basic surface.
+class Card(tk.Frame):
+	"""A panel with a rounded, hairline-bordered face.
 
-	A `tk.Frame` rather than a themed one because its `highlightthickness`
-	gives a real one-pixel border in any palette, which is what makes a card
-	read as raised instead of as a white rectangle floating on grey.
+	Tk has no rounded frame, so the shape is painted on a canvas laid under the
+	content. The frame keeps its `padx`/`pady` inset, which holds the content
+	clear of the corners, so callers grid into a card exactly as they would a
+	plain frame.
 	"""
 
-	return tk.Frame(parent, bg=CARD_BG, bd=0, highlightthickness=1,
-		highlightbackground=CARD_BORDER, highlightcolor=CARD_BORDER,
-		padx=padx, pady=pady)
+	RADIUS = 14
+
+	def __init__(self, parent: tk.Misc, padx: int = CARD_PAD, pady: int = CARD_PAD,
+		**kwargs):
+		super().__init__(parent, bg=APP_BG, bd=0, highlightthickness=0,
+			padx=padx, pady=pady, **kwargs)
+
+		self._face = tk.Canvas(self, bg=APP_BG, highlightthickness=0, bd=0)
+		# `place` measures from the padded content area, so step back by the
+		# padding and grow by twice it to cover the whole frame.
+		self._face.place(x=-padx, y=-pady, relwidth=1, relheight=1,
+			width=2 * padx, height=2 * pady)
+		self._face.bind("<Configure>", self._paint)
+
+	def _paint(self, event) -> None:
+		self._face.delete("all")
+		_round_rect(self._face, 0.5, 0.5, event.width - 0.5, event.height - 0.5,
+			self.RADIUS, fill=CARD_BG, outline=CARD_BORDER, width=1)
+
+
+def _card(parent: tk.Misc, padx: int = CARD_PAD, pady: int = CARD_PAD) -> Card:
+	return Card(parent, padx=padx, pady=pady)
+
+
+class PillButton(tk.Canvas):
+	"""A button with rounded corners and the states this window needs.
+
+	ttk buttons are rectangles and a themed one cannot be rounded, so this
+	draws its own face. It keeps the slice of the button API used here -
+	`command` and `set_enabled` - so a call site does not have to care which
+	kind of button it is holding.
+	"""
+
+	HEIGHT = 34
+	RADIUS = 10
+	PAD_X = 16
+
+	def __init__(self, parent: tk.Misc, text: str = "", command=None,
+		variant: str = "default", surround: str = CARD_BG, **kwargs):
+		super().__init__(parent, height=self.HEIGHT, highlightthickness=0, bd=0,
+			bg=surround, cursor="hand2", **kwargs)
+
+		self.command = command
+		self.variant = variant
+		self._text = text
+		self._enabled = True
+		self._hover = False
+		self._pressed = False
+
+		self.bind("<Enter>", self._enter)
+		self.bind("<Leave>", self._leave)
+		self.bind("<Button-1>", self._press)
+		self.bind("<ButtonRelease-1>", self._release)
+
+		self._resize()
+		self._draw()
+
+	def _colors(self) -> dict:
+		# Read at draw time, not import time, so a rebuilt window picks up the
+		# palette currently in force.
+		if self.variant == "accent":
+			return {"fill": ACCENT, "fg": "#ffffff", "hover": ACCENT_ACTIVE,
+				"off_fill": ACCENT_DISABLED, "off_fg": "#f0f0f0", "border": ACCENT}
+		if self.variant == "ghost":
+			return {"fill": CARD_BG, "fg": ACCENT, "hover": GHOST_HOVER,
+				"off_fill": CARD_BG, "off_fg": MUTED, "border": BORDER}
+		if self.variant == "danger":
+			return {"fill": CARD_BG, "fg": DANGER, "hover": DANGER_SOFT,
+				"off_fill": CARD_BG, "off_fg": MUTED, "border": BORDER}
+		return {"fill": CARD_BG, "fg": TEXT, "hover": BTN_HOVER,
+			"off_fill": CARD_BG, "off_fg": MUTED, "border": BORDER}
+
+	def _resize(self) -> None:
+		font = tkfont.Font(font=BASE_FONT)
+		self._width = font.measure(self._text) + 2 * self.PAD_X
+		super().configure(width=self._width)
+
+	def _draw(self) -> None:
+		self.delete("all")
+		colors = self._colors()
+
+		if not self._enabled:
+			fill, fg = colors["off_fill"], colors["off_fg"]
+		elif self._pressed or self._hover:
+			fill, fg = colors["hover"], colors["fg"]
+		else:
+			fill, fg = colors["fill"], colors["fg"]
+
+		_round_rect(self, 0.5, 0.5, self._width - 0.5, self.HEIGHT - 0.5,
+			self.RADIUS, fill=fill, outline=colors["border"], width=1)
+		self.create_text(self._width / 2, self.HEIGHT / 2 + 1, text=self._text,
+			fill=fg, font=BASE_FONT)
+
+	def set_enabled(self, enabled: bool) -> None:
+		self._enabled = bool(enabled)
+		self.configure(cursor="hand2" if enabled else "arrow")
+		self._draw()
+
+	def _enter(self, _event) -> None:
+		if self._enabled:
+			self._hover = True
+			self._draw()
+
+	def _leave(self, _event) -> None:
+		self._hover = False
+		self._pressed = False
+		self._draw()
+
+	def _press(self, _event) -> None:
+		if self._enabled:
+			self._pressed = True
+			self._draw()
+
+	def _release(self, _event) -> None:
+		was_pressed = self._pressed
+		self._pressed = False
+		self._draw()
+
+		if was_pressed and self._enabled and self.command is not None:
+			self.command()
 
 
 class ToggleSwitch(tk.Canvas):
@@ -500,29 +618,78 @@ class ToggleSwitch(tk.Canvas):
 
 	Tkinter has no switch widget, and the default checkbutton renders as a
 	setting with no visible label next to it, which is easy to read as broken.
-	This draws the familiar track-and-knob instead.
+	This draws the familiar track-and-knob, and slides the knob so a change is
+	legible at a glance.
 	"""
 
 	WIDTH = 46
-	HEIGHT = 24
+	HEIGHT = 26
+	KNOB = 20
+	STEP = 0.25
 
 	def __init__(self, parent, variable: tk.BooleanVar, **kwargs):
 		super().__init__(parent, width=self.WIDTH, height=self.HEIGHT, bd=0,
 			highlightthickness=0, bg=CARD_BG, cursor="hand2", **kwargs)
 		self.variable = variable
-		self.variable.trace_add("write", lambda *_args: self._draw())
+		self._position = 1.0 if variable.get() else 0.0
+		self._animation: str | None = None
+
+		self.variable.trace_add("write", self._animate)
 		self.bind("<Button-1>", self._toggle)
+		self.bind("<Destroy>", self._cancel)
 		self._draw()
 
 	def _draw(self) -> None:
 		self.delete("all")
 		on = self.variable.get()
 
-		_round_rect(self, 1, 3, self.WIDTH - 1, self.HEIGHT - 3, 9,
+		inset = 2
+		x1, y1 = inset, inset
+		x2, y2 = self.WIDTH - inset, self.HEIGHT - inset
+
+		_round_rect(self, x1, y1, x2, y2, (y2 - y1) / 2,
 			fill=ACCENT if on else TRACK_OFF, outline="")
 
-		centre = 36 if on else 10
-		self.create_oval(centre - 8, 4, centre + 8, 20, fill="#ffffff", outline="")
+		# The knob follows the animation, not the variable, so a flip looks
+		# like a slide rather than a jump.
+		left = x1 + self.KNOB / 2
+		right = x2 - self.KNOB / 2
+		centre = left + (right - left) * self._position
+
+		self.create_oval(centre - self.KNOB / 2, y1 + 1, centre + self.KNOB / 2,
+			y2 - 1, fill="#ffffff", outline=CARD_BORDER, width=1)
+
+	def _animate(self, *_args) -> None:
+		self._cancel()
+		target = 1.0 if self.variable.get() else 0.0
+
+		def tick():
+			self._animation = None
+
+			# A theme switch rebuilds the window out from under a running
+			# animation, so stop quietly rather than drawing on a dead widget.
+			if not self.winfo_exists():
+				return
+
+			delta = target - self._position
+
+			if abs(delta) <= self.STEP:
+				self._position = target
+			else:
+				self._position += self.STEP if delta > 0 else -self.STEP
+				self._animation = self.after(14, tick)
+
+			self._draw()
+
+		tick()
+
+	def _cancel(self, _event=None) -> None:
+		if self._animation is not None:
+			try:
+				self.after_cancel(self._animation)
+			except Exception:
+				pass
+			self._animation = None
 
 	def _toggle(self, _event=None) -> None:
 		self.variable.set(not self.variable.get())
@@ -629,48 +796,6 @@ class ManagerApp:
 		style.configure("Value.TLabel", background=CARD_BG, foreground=TEXT,
 			font=BOLD_FONT)
 
-		style.configure("TButton", font=BASE_FONT, padding=(14, 7),
-			background=CARD_BG, foreground=TEXT, bordercolor=BORDER,
-			lightcolor=CARD_BG, darkcolor=CARD_BG, focuscolor=CARD_BG,
-			focusthickness=0, relief="flat")
-		style.map("TButton",
-			background=[("pressed", BTN_HOVER), ("active", BTN_HOVER),
-				("disabled", CARD_BG)],
-			foreground=[("disabled", MUTED)],
-			bordercolor=[("disabled", BORDER)])
-
-		style.configure("Accent.TButton", background=ACCENT, foreground="#ffffff",
-			bordercolor=ACCENT, lightcolor=ACCENT, darkcolor=ACCENT,
-			focuscolor=ACCENT)
-		style.map("Accent.TButton",
-			background=[("pressed", ACCENT_ACTIVE), ("active", ACCENT_ACTIVE),
-				("disabled", ACCENT_DISABLED)],
-			foreground=[("disabled", "#f0f0f0")],
-			bordercolor=[("disabled", ACCENT_DISABLED)])
-
-		style.configure("Ghost.TButton", background=CARD_BG, foreground=ACCENT,
-			bordercolor=BORDER, lightcolor=CARD_BG, darkcolor=CARD_BG,
-			focuscolor=CARD_BG, padding=(10, 7))
-		style.map("Ghost.TButton",
-			background=[("pressed", GHOST_HOVER), ("active", GHOST_HOVER)],
-			foreground=[("disabled", MUTED)],
-			bordercolor=[("disabled", BORDER)])
-
-		style.configure("Danger.TButton", background=CARD_BG, foreground=DANGER,
-			bordercolor=BORDER, lightcolor=CARD_BG, darkcolor=CARD_BG,
-			focuscolor=CARD_BG)
-		style.map("Danger.TButton",
-			background=[("pressed", DANGER_SOFT), ("active", DANGER_SOFT)],
-			foreground=[("disabled", MUTED)],
-			bordercolor=[("disabled", BORDER)])
-
-		style.configure("Header.TButton", background=HEADER_BG, foreground=MUTED,
-			bordercolor=BORDER, lightcolor=HEADER_BG, darkcolor=HEADER_BG,
-			focuscolor=HEADER_BG, padding=(12, 5))
-		style.map("Header.TButton",
-			background=[("pressed", BTN_HOVER), ("active", BTN_HOVER)],
-			foreground=[("active", TEXT)])
-
 		style.configure("TEntry", fieldbackground=INPUT_BG, background=INPUT_BG,
 			foreground=TEXT, bordercolor=INPUT_BORDER, lightcolor=INPUT_BORDER,
 			darkcolor=INPUT_BORDER, insertcolor=TEXT, padding=6,
@@ -720,7 +845,6 @@ class ManagerApp:
 		self.nav = {}
 		self.fields = {}
 		self._nav_hovered = None
-		self._nav_hovered = None
 
 		self.root.configure(bg=APP_BG)
 		self._configure_style()
@@ -734,13 +858,6 @@ class ManagerApp:
 	def _saved_theme(self) -> str:
 		stored = self.env.get(THEME_ENV_KEY, "").strip()
 		return stored if stored in PALETTES else detect_system_theme()
-
-	def _update_theme_button(self) -> None:
-		other = "Light" if self.theme == "Dark" else "Dark"
-		self.theme_button.configure(text=f"{other} mode")
-
-	def toggle_theme(self) -> None:
-		self.set_theme("Dark" if self.theme == "Light" else "Light")
 
 	def set_theme(self, name: str) -> None:
 		if name not in PALETTES:
@@ -793,11 +910,6 @@ class ManagerApp:
 			font=TITLE_FONT).pack(anchor="w")
 		tk.Label(titles, text="Microsoft Rewards automation manager", bg=HEADER_BG,
 			fg=MUTED, font=SUBTITLE_FONT).pack(anchor="w", pady=(3, 0))
-
-		self.theme_button = ttk.Button(inner, style="Header.TButton",
-			command=self.toggle_theme)
-		self.theme_button.pack(side="right", anchor="e")
-		self._update_theme_button()
 
 		self.status_canvas = tk.Canvas(inner, height=28, bg=HEADER_BG,
 			highlightthickness=0, bd=0)
@@ -976,13 +1088,13 @@ class ManagerApp:
 		actions = tk.Frame(summary, bg=CARD_BG)
 		actions.grid(row=0, column=1, sticky="e", padx=(GAP, 0))
 
-		self.run_button = ttk.Button(actions, text="Run", style="Accent.TButton",
+		self.run_button = PillButton(actions, text="Run", variant="accent",
 			command=self.start_run)
 		self.run_button.grid(row=0, column=0, padx=(0, 8))
 
-		self.stop_button = ttk.Button(actions, text="Stop", command=self.stop_run,
-			state="disabled")
+		self.stop_button = PillButton(actions, text="Stop", command=self.stop_run)
 		self.stop_button.grid(row=0, column=1)
+		self.stop_button.set_enabled(False)
 
 		console_card = _card(tab, pady=16)
 		console_card.grid(row=1, column=0, sticky="nsew",
@@ -995,7 +1107,7 @@ class ManagerApp:
 		head.columnconfigure(0, weight=1)
 
 		ttk.Label(head, text="Output", style="H1.TLabel").grid(row=0, column=0, sticky="w")
-		ttk.Button(head, text="Clear", style="Ghost.TButton",
+		PillButton(head, text="Clear", variant="ghost",
 			command=self.clear_console).grid(row=0, column=1, sticky="e")
 
 		self.console = tk.Text(console_card, bg=CONSOLE_BG, fg=CONSOLE_FG, bd=0,
@@ -1080,26 +1192,26 @@ class ManagerApp:
 		entry = ttk.Entry(add_row, textvariable=self.new_account_var)
 		entry.grid(row=0, column=1, sticky="ew")
 		entry.bind("<Return>", lambda _event: self.add_account())
-		ttk.Button(add_row, text="Add", style="Accent.TButton",
+		PillButton(add_row, text="Add", variant="accent",
 			command=self.add_account).grid(row=0, column=2, padx=(8, 0))
-		ttk.Button(add_row, text="Add many...", style="Ghost.TButton",
+		PillButton(add_row, text="Add many...", variant="ghost",
 			command=self.add_accounts_dialog).grid(row=0, column=3, padx=(8, 0))
 
 		action_row = tk.Frame(card, bg=CARD_BG)
 		action_row.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(12, 0))
 		action_row.columnconfigure(3, weight=1)
 
-		ttk.Button(action_row, text="Select all", style="Ghost.TButton",
+		PillButton(action_row, text="Select all", variant="ghost",
 			command=self.select_all_accounts).grid(row=0, column=0, padx=(0, 8))
-		ttk.Button(action_row, text="Include", style="Ghost.TButton",
+		PillButton(action_row, text="Include", variant="ghost",
 			command=self.include_accounts).grid(row=0, column=1, padx=(0, 8))
-		ttk.Button(action_row, text="Exclude", style="Ghost.TButton",
+		PillButton(action_row, text="Exclude", variant="ghost",
 			command=self.exclude_accounts).grid(row=0, column=2)
 
-		self.signin_button = ttk.Button(action_row, text="Sign in", style="Ghost.TButton",
+		self.signin_button = PillButton(action_row, text="Sign in", variant="ghost",
 			command=self.sign_in)
 		self.signin_button.grid(row=0, column=4, padx=(8, 8))
-		self.remove_button = ttk.Button(action_row, text="Remove", style="Danger.TButton",
+		self.remove_button = PillButton(action_row, text="Remove", variant="danger",
 			command=self.remove_accounts)
 		self.remove_button.grid(row=0, column=5)
 
@@ -1124,6 +1236,8 @@ class ManagerApp:
 
 		body = self._scrollable(card)
 
+		self._build_appearance_section(body)
+
 		for section in SETTINGS:
 			self._build_section(body, section)
 
@@ -1131,10 +1245,48 @@ class ManagerApp:
 		actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(14, 0))
 		actions.columnconfigure(0, weight=1)
 
-		ttk.Button(actions, text="Reload from .env", style="Ghost.TButton",
+		PillButton(actions, text="Reload from .env", variant="ghost",
 			command=self.load_settings).grid(row=0, column=0, sticky="w")
-		ttk.Button(actions, text="Save", style="Accent.TButton",
+		PillButton(actions, text="Save", variant="accent",
 			command=self.save_settings).grid(row=0, column=1, sticky="e")
+
+	def _build_appearance_section(self, parent: tk.Frame) -> None:
+		"""The theme switch, kept with the other preferences.
+
+		It applies at once rather than on Save, because a colour scheme is
+		something you want to see before committing to it, and it is stored in
+		`.env` the moment it changes.
+		"""
+
+		block = tk.Frame(parent, bg=CARD_BG)
+		block.pack(fill="x")
+
+		ttk.Label(block, text="Appearance", style="H1.TLabel").pack(
+			anchor="w", pady=(12, 6))
+
+		row = tk.Frame(block, bg=CARD_BG)
+		row.pack(fill="x")
+
+		ttk.Label(row, text="Dark mode", style="Card.TLabel").pack(side="left")
+
+		self.theme_var = tk.BooleanVar(value=self.theme == "Dark")
+		ToggleSwitch(row, self.theme_var).pack(side="left", padx=(20, 0))
+
+		state_label = ttk.Label(row, text="", style="CardMuted.TLabel", width=6)
+		state_label.pack(side="left", padx=(10, 0))
+
+		def sync_label(*_args):
+			dark = self.theme_var.get()
+			state_label.configure(text="Dark" if dark else "Light",
+				foreground=SUCCESS if dark else MUTED)
+
+		def apply_theme(*_args):
+			self.set_theme("Dark" if self.theme_var.get() else "Light")
+
+		self.theme_var.trace_add("write", apply_theme)
+		sync_label()
+
+		tk.Frame(block, bg=BORDER, height=1).pack(fill="x", pady=(12, 0))
 
 	def _scrollable(self, parent: tk.Frame) -> tk.Frame:
 		canvas = tk.Canvas(parent, bg=CARD_BG, highlightthickness=0, bd=0)
@@ -1223,7 +1375,7 @@ class ManagerApp:
 
 			if spec.browse:
 				mode = spec.browse
-				button = ttk.Button(parent, text="Browse", style="Ghost.TButton",
+				button = PillButton(parent, text="Browse", variant="ghost",
 					command=lambda var=var, mode=mode: self._browse(var, mode))
 				button.grid(row=row, column=2, sticky="e", padx=(8, 0))
 
@@ -1415,8 +1567,9 @@ class ManagerApp:
 			if names:
 				self._add_names(names)
 
-		ttk.Button(buttons, text="Add", style="Accent.TButton", command=submit).pack(side="right")
-		ttk.Button(buttons, text="Cancel", style="Ghost.TButton",
+		PillButton(buttons, text="Add", variant="accent",
+			command=submit).pack(side="right")
+		PillButton(buttons, text="Cancel", variant="ghost",
 			command=dialog.destroy).pack(side="right", padx=(0, 8))
 
 		dialog.bind("<Escape>", lambda _event: dialog.destroy())
@@ -1729,7 +1882,7 @@ class ManagerApp:
 
 		self.stopping = True
 		self.set_status("running", "Stopping...")
-		self.stop_button.configure(state="disabled")
+		self.stop_button.set_enabled(False)
 
 		try:
 			self._terminate(self.process)
@@ -1807,9 +1960,9 @@ class ManagerApp:
 	def _update_controls(self) -> None:
 		running = self.process is not None
 
-		self.run_button.configure(state="disabled" if (running or self.signin_active) else "normal")
-		self.stop_button.configure(state="normal" if running else "disabled")
-		self.signin_button.configure(state="disabled" if (running or self.signin_active) else "normal")
+		self.run_button.set_enabled(not (running or self.signin_active))
+		self.stop_button.set_enabled(running)
+		self.signin_button.set_enabled(not (running or self.signin_active))
 
 	# endregion
 
