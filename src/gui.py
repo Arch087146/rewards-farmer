@@ -25,6 +25,7 @@ import threading
 import time
 import tkinter as tk
 import tkinter.font as tkfont
+import traceback
 from dataclasses import dataclass, field as dataclass_field
 from tkinter import filedialog, messagebox, ttk
 
@@ -735,6 +736,7 @@ class ManagerApp:
 		return stored if stored in PALETTES else detect_system_theme()
 
 	def _update_theme_button(self) -> None:
+		other = "Light" if self.theme == "Dark" else "Dark"
 		self.theme_button.configure(text=f"{other} mode")
 
 	def toggle_theme(self) -> None:
@@ -1858,6 +1860,28 @@ class ManagerApp:
 	# endregion
 
 
+def _report_failure(message: str) -> None:
+	"""Surface a crash that `pythonw` would otherwise swallow.
+
+	The launcher starts this file with no console, so an exception on the way
+	up looks like nothing happening at all. A dialog says what went wrong
+	where a traceback would have gone, and the same text goes to a log beside
+	the project for when even the dialog cannot open.
+	"""
+
+	try:
+		messagebox.showerror("Rewards Farmer", message)
+	except Exception:
+		pass
+
+	try:
+		with open(os.path.join(REPO_ROOT, "gui-error.log"), "a",
+			encoding="utf-8") as handle:
+			handle.write(message.rstrip() + "\n")
+	except OSError:
+		pass
+
+
 def _enable_dpi_awareness() -> None:
 	"""Ask Windows for crisp text; harmless where the call is missing."""
 	if sys.platform != "win32":
@@ -1871,8 +1895,24 @@ def _enable_dpi_awareness() -> None:
 
 def main() -> int:
 	_enable_dpi_awareness()
-	root = tk.Tk()
-	ManagerApp(root)
+
+	try:
+		root = tk.Tk()
+	except Exception:
+		_report_failure("Could not open a window:\n\n" + traceback.format_exc())
+		return 1
+
+	# An exception inside a callback is otherwise invisible too: pythonw has no
+	# console for Tk's default handler to print to.
+	root.report_callback_exception = lambda *exc: _report_failure(
+		"".join(traceback.format_exception(*exc)))
+
+	try:
+		ManagerApp(root)
+	except Exception:
+		_report_failure("Rewards Farmer could not start:\n\n" + traceback.format_exc())
+		return 1
+
 	root.mainloop()
 
 	return 0

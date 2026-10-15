@@ -10,6 +10,7 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
 sys.path.insert(0, SRC)
@@ -165,6 +166,28 @@ class TestReadProfileEmail(unittest.TestCase):
 		(self.profile / "Default" / "Preferences").write_text("{not json", encoding="utf-8")
 
 		self.assertEqual(gui.read_profile_email(str(self.profile)), "not signed in")
+
+
+class TestFailureReporting(unittest.TestCase):
+	"""A crash started from the .bat must not vanish without a word.
+
+	The launcher runs this file under `pythonw`, which has no console, so an
+	exception on the way up used to look like the window simply refusing to
+	open. `_report_failure` has to get the message somewhere durable.
+	"""
+
+	def test_the_message_is_written_to_the_log(self):
+		with TemporaryDirectory() as directory:
+			original = gui.REPO_ROOT
+			gui.REPO_ROOT = directory
+			self.addCleanup(setattr, gui, "REPO_ROOT", original)
+
+			# The dialog is the other half, but a test has no one to click OK.
+			with mock.patch.object(gui.messagebox, "showerror"):
+				gui._report_failure("boom: the window fell over")
+
+			log = Path(directory) / "gui-error.log"
+			self.assertIn("boom: the window fell over", log.read_text(encoding="utf-8"))
 
 
 class TestPalette(unittest.TestCase):
