@@ -69,8 +69,7 @@ LIGHT_PALETTE = {
 	"TRACK_OFF": "#cbd0d6",
 	"BTN_HOVER": "#eef0f3",
 	"GHOST_HOVER": "#eef4fb",
-	"INPUT_BG": "#ffffff",
-	"INPUT_BORDER": "#d5d9df",
+	"FIELD_BG": "#f2f4f7",
 	"HEADING_BG": "#fafbfc",
 	"ROW_ALT": "#fafbfc",
 	"PILL_BG": "#f2f4f7",
@@ -107,8 +106,7 @@ DARK_PALETTE = {
 	"TRACK_OFF": "#4a4e55",
 	"BTN_HOVER": "#2c2f35",
 	"GHOST_HOVER": "#26313d",
-	"INPUT_BG": "#26282d",
-	"INPUT_BORDER": "#3a3e45",
+	"FIELD_BG": "#26282d",
 	"HEADING_BG": "#26282c",
 	"ROW_ALT": "#26282c",
 	"PILL_BG": "#26292e",
@@ -155,8 +153,7 @@ NAV_SELECTED = LIGHT_PALETTE["NAV_SELECTED"]
 TRACK_OFF = LIGHT_PALETTE["TRACK_OFF"]
 BTN_HOVER = LIGHT_PALETTE["BTN_HOVER"]
 GHOST_HOVER = LIGHT_PALETTE["GHOST_HOVER"]
-INPUT_BG = LIGHT_PALETTE["INPUT_BG"]
-INPUT_BORDER = LIGHT_PALETTE["INPUT_BORDER"]
+FIELD_BG = LIGHT_PALETTE["FIELD_BG"]
 HEADING_BG = LIGHT_PALETTE["HEADING_BG"]
 ROW_ALT = LIGHT_PALETTE["ROW_ALT"]
 PILL_BG = LIGHT_PALETTE["PILL_BG"]
@@ -618,9 +615,9 @@ class RoundedField(tk.Frame):
 	"""A rounded surround for a single-line text or choice field.
 
 	ttk entries and comboboxes are square, which reads as unfinished beside
-	the rounded cards and buttons. This draws the rounded border and seats a
-	borderless widget inside it, and lights the border while the field has
-	focus.
+	the rounded cards and buttons. This paints a soft rounded fill and seats
+	a borderless widget on top of it, and rings the fill with the accent
+	while the field has focus.
 	"""
 
 	RADIUS = 8
@@ -659,9 +656,12 @@ class RoundedField(tk.Frame):
 		height = self._face.winfo_height()
 
 		self._face.delete("all")
+		# A soft fill and no stroke: an outline here read as heavy, and the
+		# fill alone is enough to say "this is where you type". The accent
+		# edge is saved for focus, where it actually means something.
 		_round_rect(self._face, 0.5, 0.5, width - 0.5, height - 0.5,
-			self.RADIUS, fill=INPUT_BG,
-			outline=ACCENT if self._focused else INPUT_BORDER, width=1)
+			self.RADIUS, fill=FIELD_BG,
+			outline=ACCENT if self._focused else FIELD_BG, width=1)
 
 
 class ToggleSwitch(tk.Canvas):
@@ -848,23 +848,24 @@ class ManagerApp:
 			font=BOLD_FONT)
 
 		# Inside a RoundedField the entry draws no chrome of its own; the field
-		# paints the border, so everything in the window shares one round shape.
+		# paints the whole surface, so the text sits on one clean fill.
 		style.configure("Field.TEntry", borderwidth=0, relief="flat",
-			fieldbackground=INPUT_BG, background=INPUT_BG, foreground=TEXT,
+			fieldbackground=FIELD_BG, background=FIELD_BG, foreground=TEXT,
 			insertcolor=TEXT, padding=0, selectbackground=ACCENT,
-			selectforeground="#ffffff")
+			selectforeground="#ffffff", bordercolor=FIELD_BG,
+			lightcolor=FIELD_BG, darkcolor=FIELD_BG)
 		style.map("Field.TEntry",
-			fieldbackground=[("disabled", INPUT_BG)],
+			fieldbackground=[("disabled", FIELD_BG)],
 			foreground=[("disabled", MUTED)])
 
 		style.configure("Field.TCombobox", borderwidth=0, relief="flat",
-			fieldbackground=INPUT_BG, background=INPUT_BG, foreground=TEXT,
-			arrowcolor=MUTED, padding=0, lightcolor=INPUT_BG, darkcolor=INPUT_BG,
-			bordercolor=INPUT_BG, selectbackground=INPUT_BG, selectforeground=TEXT)
+			fieldbackground=FIELD_BG, background=FIELD_BG, foreground=TEXT,
+			arrowcolor=MUTED, padding=0, lightcolor=FIELD_BG, darkcolor=FIELD_BG,
+			bordercolor=FIELD_BG, selectbackground=FIELD_BG, selectforeground=TEXT)
 		style.map("Field.TCombobox",
-			fieldbackground=[("readonly", INPUT_BG), ("disabled", INPUT_BG)],
+			fieldbackground=[("readonly", FIELD_BG), ("disabled", FIELD_BG)],
 			foreground=[("readonly", TEXT), ("disabled", MUTED)],
-			bordercolor=[("focus", INPUT_BG)],
+			bordercolor=[("focus", FIELD_BG)],
 			arrowcolor=[("disabled", IDLE)])
 
 		# The treeview and its headings default to the platform's own colours,
@@ -1699,9 +1700,9 @@ class ManagerApp:
 			text="Letters, digits, dot, dash or underscore. Commas and blank "
 			     "lines are fine too; duplicates are skipped.").pack(anchor="w", pady=(4, 10))
 
-		text = tk.Text(wrapper, width=44, height=12, bg=INPUT_BG, fg=TEXT,
+		text = tk.Text(wrapper, width=44, height=12, bg=FIELD_BG, fg=TEXT,
 			insertbackground=TEXT, bd=0, highlightthickness=1,
-			highlightbackground=INPUT_BORDER, highlightcolor=ACCENT, font=BASE_FONT,
+			highlightbackground=FIELD_BG, highlightcolor=ACCENT, font=BASE_FONT,
 			padx=10, pady=8, wrap="none")
 		text.pack(fill="both", expand=True)
 		text.focus_set()
