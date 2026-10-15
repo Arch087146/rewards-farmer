@@ -16,6 +16,7 @@ without the console window.
 
 import logging
 import json
+import math
 import os
 import queue
 import re
@@ -461,7 +462,15 @@ def read_profile_email(profile_dir: str) -> str:
 
 def _round_rect(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float,
 	radius: float, **kwargs):
-	"""A rounded rectangle, drawn as a smoothed polygon."""
+	"""A rounded rectangle, drawn as a smoothed polygon.
+
+	The radius is capped at half the width or height. Past that the corner
+	points cross back over each other and the outline kinks, which the
+	smoothing then smears into a lopsided wobble.
+	"""
+
+	radius = max(0.0, min(radius, (x2 - x1) / 2, (y2 - y1) / 2))
+
 	points = (
 		x1 + radius, y1,
 		x2 - radius, y1,
@@ -476,6 +485,36 @@ def _round_rect(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float,
 		x1, y1 + radius,
 		x1, y1,
 	)
+
+	return canvas.create_polygon(points, smooth=True, **kwargs)
+
+
+def _pill(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float,
+	steps: int = 16, **kwargs):
+	"""A capsule: straight sides, semicircular ends.
+
+	`_round_rect` places only a few points per corner, and on a shape as short
+	as the toggle's track the spline bows the straight edges until the whole
+	thing reads as a blob. Sampling the outline finely keeps it a capsule.
+	The ends sit on whichever axis is the shorter one.
+	"""
+
+	centre_x = (x1 + x2) / 2
+	centre_y = (y1 + y2) / 2
+	points = []
+
+	if x2 - x1 <= y2 - y1:
+		radius = (x2 - x1) / 2
+		caps = ((centre_x, y1 + radius, 180), (centre_x, y2 - radius, 0))
+	else:
+		radius = (y2 - y1) / 2
+		caps = ((x1 + radius, centre_y, 90), (x2 - radius, centre_y, 270))
+
+	for cap_x, cap_y, start in caps:
+		for step in range(steps + 1):
+			angle = math.radians(start + step * (180 / steps))
+			points.append(cap_x + radius * math.cos(angle))
+			points.append(cap_y + radius * math.sin(angle))
 
 	return canvas.create_polygon(points, smooth=True, **kwargs)
 
@@ -696,8 +735,10 @@ class ToggleSwitch(tk.Canvas):
 		self.delete("all")
 		on = self.variable.get()
 
-		_round_rect(self, 0.5, 0.5, self.WIDTH - 0.5, self.HEIGHT - 0.5,
-			self.HEIGHT / 2, fill=ACCENT if on else TRACK_OFF, outline="")
+		# A capsule, not a rounded rect: the track is nearly as tall as it is
+		# round, so the corner arcs have to meet the straight edges exactly.
+		_pill(self, 0, 0, self.WIDTH, self.HEIGHT,
+			fill=ACCENT if on else TRACK_OFF, outline="")
 
 		# The knob follows the animation, not the variable, so a flip looks
 		# like a slide rather than a jump. It stays a plain white disc: the
@@ -821,8 +862,7 @@ class PillScrollbar(tk.Canvas):
 			# down the side, which would read as a divider.
 			return
 
-		_round_rect(self, x1, top + 1, x2, top + size - 1, (x2 - x1) / 2,
-			fill=fill, outline="")
+		_pill(self, x1, top + 1, x2, top + size - 1, fill=fill, outline="")
 
 	def _press(self, event) -> None:
 		height, top, size = self._thumb()
