@@ -656,8 +656,8 @@ class RoundedField(tk.Frame):
 
 	ttk entries and comboboxes are square, which reads as unfinished beside
 	the rounded cards and buttons. This paints a soft rounded fill and seats
-	a borderless widget on top of it, and rings the fill with the accent
-	while the field has focus.
+	a borderless widget on top of it. The fill is the whole story: the field
+	looks the same focused or not, and the caret says where the typing goes.
 	"""
 
 	RADIUS = 8
@@ -668,7 +668,6 @@ class RoundedField(tk.Frame):
 		super().__init__(parent, bg=CARD_BG, width=width, height=self.HEIGHT,
 			bd=0, highlightthickness=0, **kwargs)
 
-		self._focused = False
 		self._face = tk.Canvas(self, bg=CARD_BG, highlightthickness=0, bd=0)
 		self._face.place(x=0, y=0, relwidth=1, relheight=1)
 		self._face.bind("<Configure>", self._paint)
@@ -678,30 +677,19 @@ class RoundedField(tk.Frame):
 
 		widget.place(relx=0, rely=0.5, anchor="w", x=self.PAD_X, relwidth=1,
 			width=-2 * self.PAD_X, height=self.HEIGHT - 12)
-		widget.bind("<FocusIn>", self._focus_in, add="+")
-		widget.bind("<FocusOut>", self._focus_out, add="+")
 
 		return widget
-
-	def _focus_in(self, _event) -> None:
-		self._focused = True
-		self._paint()
-
-	def _focus_out(self, _event) -> None:
-		self._focused = False
-		self._paint()
 
 	def _paint(self, _event=None) -> None:
 		width = self._face.winfo_width()
 		height = self._face.winfo_height()
 
 		self._face.delete("all")
-		# A soft fill and no stroke: an outline here read as heavy, and the
-		# fill alone is enough to say "this is where you type". The accent
-		# edge is saved for focus, where it actually means something.
+		# A soft fill and no stroke. An outline here read as heavy, and one
+		# that appeared only on focus read as a glitch, so the fill carries
+		# the whole shape in every state.
 		_round_rect(self._face, 0.5, 0.5, width - 0.5, height - 0.5,
-			self.RADIUS, fill=FIELD_BG,
-			outline=ACCENT if self._focused else FIELD_BG, width=1)
+			self.RADIUS, fill=FIELD_BG, outline=FIELD_BG, width=1)
 
 
 class ToggleSwitch(tk.Canvas):
@@ -1043,9 +1031,15 @@ class ManagerApp:
 			insertcolor=TEXT, padding=0, selectbackground=ACCENT,
 			selectforeground="#ffffff", bordercolor=FIELD_BG,
 			lightcolor=FIELD_BG, darkcolor=FIELD_BG)
+		# The clam theme rings a focused entry with a blue border of its own
+		# (bordercolor/lightcolor/darkcolor all shift on focus). Those are
+		# pinned back to the fill so the field stays one clean surface.
 		style.map("Field.TEntry",
 			fieldbackground=[("disabled", FIELD_BG)],
-			foreground=[("disabled", MUTED)])
+			foreground=[("disabled", MUTED)],
+			bordercolor=[("focus", FIELD_BG)],
+			lightcolor=[("focus", FIELD_BG)],
+			darkcolor=[("focus", FIELD_BG)])
 
 		style.configure("Field.TCombobox", borderwidth=0, relief="flat",
 			fieldbackground=FIELD_BG, background=FIELD_BG, foreground=TEXT,
@@ -1882,8 +1876,8 @@ class ManagerApp:
 
 		text = tk.Text(wrapper, width=44, height=12, bg=FIELD_BG, fg=TEXT,
 			insertbackground=TEXT, bd=0, highlightthickness=1,
-			highlightbackground=FIELD_BG, highlightcolor=ACCENT, font=BASE_FONT,
-			padx=10, pady=8, wrap="none")
+			highlightbackground=FIELD_BG, highlightcolor=FIELD_BG,
+			font=BASE_FONT, padx=10, pady=8, wrap="none")
 		text.pack(fill="both", expand=True)
 		text.focus_set()
 
