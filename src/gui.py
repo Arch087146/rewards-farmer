@@ -676,7 +676,9 @@ class ToggleSwitch(tk.Canvas):
 	WIDTH = 46
 	HEIGHT = 26
 	KNOB = 20
-	STEP = 0.25
+	PAD = 3
+	EASE = 0.35
+	SNAP = 0.02
 
 	def __init__(self, parent, variable: tk.BooleanVar, **kwargs):
 		super().__init__(parent, width=self.WIDTH, height=self.HEIGHT, bd=0,
@@ -694,21 +696,21 @@ class ToggleSwitch(tk.Canvas):
 		self.delete("all")
 		on = self.variable.get()
 
-		inset = 2
-		x1, y1 = inset, inset
-		x2, y2 = self.WIDTH - inset, self.HEIGHT - inset
-
-		_round_rect(self, x1, y1, x2, y2, (y2 - y1) / 2,
-			fill=ACCENT if on else TRACK_OFF, outline="")
+		_round_rect(self, 0.5, 0.5, self.WIDTH - 0.5, self.HEIGHT - 0.5,
+			self.HEIGHT / 2, fill=ACCENT if on else TRACK_OFF, outline="")
 
 		# The knob follows the animation, not the variable, so a flip looks
-		# like a slide rather than a jump.
-		left = x1 + self.KNOB / 2
-		right = x2 - self.KNOB / 2
-		centre = left + (right - left) * self._position
+		# like a slide rather than a jump. It stays a plain white disc: the
+		# hairline ring it used to carry read as a wireframe, and the gap to
+		# the track edge does the same job more quietly.
+		radius = self.KNOB / 2
+		centre_y = self.HEIGHT / 2
+		left = self.PAD + radius
+		right = self.WIDTH - self.PAD - radius
+		centre_x = left + (right - left) * self._position
 
-		self.create_oval(centre - self.KNOB / 2, y1 + 1, centre + self.KNOB / 2,
-			y2 - 1, fill="#ffffff", outline=CARD_BORDER, width=1)
+		self.create_oval(centre_x - radius, centre_y - radius,
+			centre_x + radius, centre_y + radius, fill="#ffffff", outline="")
 
 	def _animate(self, *_args) -> None:
 		self._cancel()
@@ -722,12 +724,14 @@ class ToggleSwitch(tk.Canvas):
 			if not self.winfo_exists():
 				return
 
+			# Ease out: each frame covers a fixed share of what is left, so
+			# the knob leaves quickly and settles gently instead of stepping.
 			delta = target - self._position
 
-			if abs(delta) <= self.STEP:
+			if abs(delta) <= self.SNAP:
 				self._position = target
 			else:
-				self._position += self.STEP if delta > 0 else -self.STEP
+				self._position += delta * self.EASE
 				self._animation = self.after(14, tick)
 
 			self._draw()
@@ -744,6 +748,114 @@ class ToggleSwitch(tk.Canvas):
 
 	def _toggle(self, _event=None) -> None:
 		self.variable.set(not self.variable.get())
+
+
+class PillScrollbar(tk.Canvas):
+	"""A slim, floating scrollbar with no arrow buttons.
+
+	ttk's scrollbar keeps its up/down arrows and a square thumb that sits
+	flush against the edges, which is the last dated-looking control in the
+	window. This draws one rounded thumb that floats in the trough and speaks
+	the same `set`/`command` contract as `ttk.Scrollbar`, so it drops straight
+	in where one was.
+	"""
+
+	WIDTH = 12
+	PAD = 3
+	MIN_THUMB = 30
+
+	def __init__(self, parent, command=None, **kwargs):
+		super().__init__(parent, width=self.WIDTH, highlightthickness=0, bd=0,
+			bg=CARD_BG, **kwargs)
+		self.command = command
+		self._first = 0.0
+		self._last = 1.0
+		self._hover = False
+		self._grabbed = None
+		self._grab_first = 0.0
+
+		self.bind("<Configure>", self._redraw)
+		self.bind("<Enter>", lambda _event: self._set_hover(True))
+		self.bind("<Leave>", lambda _event: self._set_hover(False))
+		self.bind("<Button-1>", self._press)
+		self.bind("<B1-Motion>", self._drag)
+		self.bind("<ButtonRelease-1>", lambda _event: self._release())
+
+	def set(self, first, last) -> None:
+		"""Mirror of `ttk.Scrollbar.set`, driven by the widget's yscrollcommand."""
+
+		try:
+			self._first = float(first)
+			self._last = float(last)
+		except (TypeError, ValueError):
+			return
+
+		self._redraw()
+
+	def _set_hover(self, value: bool) -> None:
+		if self._hover != value:
+			self._hover = value
+			self._redraw()
+
+	def _thumb(self):
+		height = self.winfo_height()
+		span = max(self._last - self._first, 0.0)
+		size = min(max(self.MIN_THUMB, span * height), height)
+		top = min(self._first * height, height - size)
+
+		return height, top, size
+
+	def _redraw(self, _event=None) -> None:
+		self.delete("all")
+		height = self.winfo_height()
+
+		if height < 2:
+			return
+
+		_, top, size = self._thumb()
+		x1, x2 = self.PAD, self.WIDTH - self.PAD
+		fill = SCROLL_HOVER if self._hover else SCROLL_THUMB
+
+		if size >= height:
+			# Nothing to scroll: hide the thumb rather than park a full bar
+			# down the side, which would read as a divider.
+			return
+
+		_round_rect(self, x1, top + 1, x2, top + size - 1, (x2 - x1) / 2,
+			fill=fill, outline="")
+
+	def _press(self, event) -> None:
+		height, top, size = self._thumb()
+
+		if top <= event.y <= top + size:
+			self._grab_first = self._first
+		else:
+			# Centre the thumb on the click, then keep dragging from there.
+			self._grab_first = (event.y - size / 2) / height
+			self._move(self._grab_first)
+
+		self._grabbed = event.y
+
+	def _drag(self, event) -> None:
+		if self._grabbed is None:
+			return
+
+		height = self.winfo_height()
+
+		if height <= 0:
+			return
+
+		self._move(self._grab_first + (event.y - self._grabbed) / height)
+
+	def _release(self) -> None:
+		self._grabbed = None
+
+	def _move(self, first: float) -> None:
+		span = self._last - self._first
+		first = min(max(first, 0.0), max(1.0 - span, 0.0))
+
+		if self.command:
+			self.command("moveto", first)
 
 
 class TkLogHandler(logging.Handler):
@@ -882,13 +994,6 @@ class ManagerApp:
 		style.map("Treeview",
 			background=[("selected", ACCENT_SOFT)],
 			foreground=[("selected", TEXT)])
-
-		style.configure("Vertical.TScrollbar", background=SCROLL_THUMB,
-			troughcolor=CARD_BG, bordercolor=CARD_BG, arrowcolor=MUTED,
-			lightcolor=SCROLL_THUMB, darkcolor=SCROLL_THUMB, relief="flat",
-			width=11)
-		style.map("Vertical.TScrollbar",
-			background=[("active", SCROLL_HOVER), ("pressed", SCROLL_HOVER)])
 
 	def _build_chrome(self) -> None:
 		"""Draw the whole window. Called again, from scratch, on a theme switch.
@@ -1242,8 +1347,7 @@ class ManagerApp:
 			highlightcolor=CONSOLE_BORDER, insertbackground=CONSOLE_FG,
 			state="disabled", spacing1=1, spacing3=1)
 
-		scrollbar = ttk.Scrollbar(console_card, orient="vertical",
-			command=self.console.yview)
+		scrollbar = PillScrollbar(console_card, command=self.console.yview)
 		self.console.configure(yscrollcommand=scrollbar.set)
 
 		self.console.grid(row=1, column=0, sticky="nsew")
@@ -1305,8 +1409,7 @@ class ManagerApp:
 		self.accounts_tree.bind("<Motion>", self._hover_row)
 		self.accounts_tree.bind("<Leave>", lambda _event: self._set_row_hover(None))
 
-		tree_scroll = ttk.Scrollbar(card, orient="vertical",
-			command=self.accounts_tree.yview)
+		tree_scroll = PillScrollbar(card, command=self.accounts_tree.yview)
 		self.accounts_tree.configure(yscrollcommand=tree_scroll.set)
 		tree_scroll.grid(row=2, column=1, sticky="ns", padx=(8, 0))
 
@@ -1427,7 +1530,7 @@ class ManagerApp:
 
 	def _scrollable(self, parent: tk.Frame) -> tk.Frame:
 		canvas = tk.Canvas(parent, bg=CARD_BG, highlightthickness=0, bd=0)
-		scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+		scrollbar = PillScrollbar(parent, command=canvas.yview)
 		canvas.configure(yscrollcommand=scrollbar.set)
 
 		canvas.grid(row=1, column=0, sticky="nsew")
