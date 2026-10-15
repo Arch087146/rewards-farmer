@@ -658,10 +658,11 @@ class PillButton(tk.Canvas):
 class RoundedField(tk.Frame):
 	"""A rounded surround for a single-line text or choice field.
 
-	ttk entries and comboboxes are square, which reads as unfinished beside
-	the rounded cards and buttons. This paints a soft rounded fill and seats
-	a borderless widget on top of it. The fill is the whole story: the field
-	looks the same focused or not, and the caret says where the typing goes.
+	A ttk entry is square, which reads as unfinished beside the rounded
+	cards and buttons. This paints a soft rounded fill and seats a
+	borderless widget on top of it - an entry, or the select control that
+	opens a choice. The fill is the whole story: the field looks the same
+	focused or not, and the caret says where the typing goes.
 	"""
 
 	RADIUS = 8
@@ -694,6 +695,254 @@ class RoundedField(tk.Frame):
 		# the whole shape in every state.
 		_round_rect(self._face, 0.5, 0.5, width - 0.5, height - 0.5,
 			self.RADIUS, fill=FIELD_BG, outline=FIELD_BG, width=1)
+
+
+class SelectControl(tk.Canvas):
+	"""The control inside a choice field, and the menu it opens.
+
+	ttk's combobox drops a square listbox inside a bezel - tight rows, the
+	text flush against the edge, no hover, and past a few items an arrowed
+	scrollbar. It was the last control in the window that still looked like
+	the platform rather than the window, so its menu is drawn here instead:
+	a rounded card of roomy rows that answer the pointer, and the row the
+	value already holds shown in the accent.
+
+	It is seated in a RoundedField, which supplies the soft fill of the
+	closed control, so a choice reads exactly like the text field beside
+	it. The field also does the inset, so the label sits at this canvas's
+	left edge and the chevron at its right.
+	"""
+
+	RADIUS = 10
+	ROW_HEIGHT = 30
+	MENU_PAD = 6
+	MAX_ROWS = 8
+	GAP = 4
+	# Only the menu's corners are painted this, and the window is told to
+	# treat it as see-through, so the card has no square patch behind it.
+	BLANK = "#ff00fe"
+
+	def __init__(self, parent: tk.Misc, variable: tk.StringVar, values=(),
+		**kwargs):
+		super().__init__(parent, bd=0, highlightthickness=0, bg=FIELD_BG,
+			cursor="hand2", **kwargs)
+
+		self.variable = variable
+		self.values = [str(value) for value in values]
+		self._menu: tk.Toplevel | None = None
+		self._canvas: tk.Canvas | None = None
+		self._origin = (0, 0)
+		self._size = (0, 0)
+		self._hover = -1
+		self._top = 0
+		self._rows = min(len(self.values), self.MAX_ROWS)
+		self._chevron: tuple | None = None
+
+		self.bind("<Configure>", self._draw)
+		self.bind("<Button-1>", self._open)
+		self.bind("<Destroy>", lambda _event: self._close())
+		self.variable.trace_add("write", self._changed)
+
+	def _changed(self, *_args) -> None:
+		if self.winfo_exists():
+			self._draw()
+
+	def _draw(self, _event=None) -> None:
+		self.delete("all")
+		width = self.winfo_width()
+		height = self.winfo_height()
+
+		if width < 2 or height < 2:
+			return
+
+		self.create_text(0, height / 2, anchor="w", text=self.variable.get(),
+			fill=TEXT if self.values else MUTED, font=BASE_FONT)
+		self.create_image(width, height / 2, anchor="e", image=self._arrow())
+
+	def _arrow(self) -> ImageTk.PhotoImage:
+		"""A chevron, drawn oversized and shrunk so it does not step."""
+
+		key = (FIELD_BG, MUTED)
+
+		if self._chevron is None or self._chevron[0] != key:
+			scale = 4
+			width, height = 10, 6
+			image = Image.new("RGB", (width * scale, height * scale), FIELD_BG)
+			draw = ImageDraw.Draw(image)
+			draw.line([(scale / 2, scale / 2),
+				(width * scale / 2, height * scale - scale / 2),
+				(width * scale - scale / 2, scale / 2)],
+				fill=MUTED, width=int(1.5 * scale), joint="curve")
+			self._chevron = (key, ImageTk.PhotoImage(
+				image.resize((width, height), Image.Resampling.LANCZOS),
+				master=self))
+
+		return self._chevron[1]
+
+	# region menu
+
+	def _open(self, _event=None) -> None:
+		if self._menu is not None or not self.values:
+			return
+
+		menu = tk.Toplevel(self)
+		menu.overrideredirect(True)
+		menu.configure(bg=self.BLANK)
+		menu.attributes("-topmost", True)
+
+		try:
+			menu.attributes("-transparentcolor", self.BLANK)
+			blank = self.BLANK
+		except tk.TclError:
+			# Without a see-through colour the corners take the card fill
+			# instead; the menu still reads as a card, just a squarer one.
+			blank = CARD_BG
+			menu.configure(bg=blank)
+
+		width = max(self.master.winfo_width(), 120)
+		height = self._rows * self.ROW_HEIGHT + 2 * self.MENU_PAD
+		canvas = tk.Canvas(menu, width=width, height=height, bd=0,
+			highlightthickness=0, bg=blank)
+		canvas.pack()
+
+		value = self.variable.get()
+		self._menu = menu
+		self._canvas = canvas
+		self._hover = self.values.index(value) if value in self.values else -1
+		self._top = max(0, self._hover - self._rows + 1)
+
+		# Hang it under the field, or above it when the screen runs out.
+		menu.update_idletasks()
+		field = self.master
+		x = field.winfo_rootx()
+		y = field.winfo_rooty() + field.winfo_height() + self.GAP
+
+		if y + height > self.winfo_screenheight():
+			y = max(0, field.winfo_rooty() - height - self.GAP)
+
+		self._origin = (x, y)
+		self._size = (width, height)
+		menu.geometry(f"{width}x{height}+{x}+{y}")
+		# An overrideredirect window is not on screen until it is asked for,
+		# which is also why Tk's own combobox deiconifies its popdown here.
+		menu.deiconify()
+		menu.lift()
+
+		self._paint()
+		canvas.bind("<Motion>", self._motion)
+		canvas.bind("<Button-1>", self._click)
+		canvas.bind("<MouseWheel>", self._wheel)
+		menu.bind("<Key>", self._key)
+		menu.grab_set()
+		menu.focus_force()
+
+	def _paint(self) -> None:
+		canvas = self._canvas
+
+		if canvas is None:
+			return
+
+		canvas.delete("all")
+		width, height = self._size
+		_round_rect(canvas, 0.5, 0.5, width - 0.5, height - 0.5, self.RADIUS,
+			fill=CARD_BG, outline=CARD_BORDER, width=1)
+
+		value = self.variable.get()
+		for index in range(self._top, min(self._top + self._rows, len(self.values))):
+			top = self.MENU_PAD + (index - self._top) * self.ROW_HEIGHT
+
+			if index == self._hover:
+				_round_rect(canvas, self.MENU_PAD, top + 1, width - self.MENU_PAD,
+					top + self.ROW_HEIGHT - 1, self.RADIUS - 3,
+					fill=ACCENT_SOFT, outline="")
+
+			canvas.create_text(self.MENU_PAD + 6, top + self.ROW_HEIGHT / 2,
+				anchor="w", text=self.values[index],
+				fill=ACCENT if self.values[index] == value else TEXT,
+				font=BASE_FONT)
+
+	def _row_at(self, y: int) -> int:
+		index = self._top + int((y - self.MENU_PAD) // self.ROW_HEIGHT)
+
+		if self._top <= index < min(self._top + self._rows, len(self.values)):
+			return index
+
+		return -1
+
+	def _highlight(self, index: int) -> None:
+		if index >= 0 and index != self._hover:
+			self._hover = index
+			self._paint()
+
+	def _move(self, step: int) -> None:
+		if not self.values:
+			return
+
+		if self._hover < 0:
+			index = 0 if step > 0 else len(self.values) - 1
+		else:
+			index = min(max(self._hover + step, 0), len(self.values) - 1)
+
+		self._hover = index
+		self._top = min(max(self._top, index - self._rows + 1), index)
+
+		self._paint()
+
+	def _take(self) -> None:
+		if 0 <= self._hover < len(self.values):
+			self.variable.set(self.values[self._hover])
+
+		self._close()
+
+	def _motion(self, event) -> None:
+		self._highlight(self._row_at(event.y))
+
+	def _click(self, event) -> None:
+		# The grab sends clicks outside the menu here too, which is how a
+		# click anywhere else dismisses it.
+		x, y = self._origin
+		width, height = self._size
+
+		if not (x <= event.x_root < x + width and y <= event.y_root < y + height):
+			self._close()
+			return
+
+		self._hover = self._row_at(event.y)
+		self._take()
+
+	def _wheel(self, event) -> None:
+		self._move(-1 if event.delta > 0 else 1)
+
+	def _key(self, event) -> None:
+		if event.keysym == "Up":
+			self._move(-1)
+		elif event.keysym == "Down":
+			self._move(1)
+		elif event.keysym == "Home":
+			self._move(-len(self.values))
+		elif event.keysym == "End":
+			self._move(len(self.values))
+		elif event.keysym in ("Return", "KP_Enter", "space"):
+			self._take()
+		elif event.keysym == "Escape":
+			self._close()
+
+	def _close(self) -> None:
+		menu = self._menu
+		self._menu = None
+		self._canvas = None
+
+		if menu is None:
+			return
+
+		try:
+			menu.grab_release()
+		except tk.TclError:
+			pass
+
+		menu.destroy()
+
+	# endregion
 
 
 class ToggleSwitch(tk.Canvas):
@@ -1044,34 +1293,6 @@ class ManagerApp:
 			bordercolor=[("focus", FIELD_BG)],
 			lightcolor=[("focus", FIELD_BG)],
 			darkcolor=[("focus", FIELD_BG)])
-
-		style.configure("Field.TCombobox", borderwidth=0, relief="flat",
-			fieldbackground=FIELD_BG, background=FIELD_BG, foreground=TEXT,
-			arrowcolor=MUTED, padding=0, lightcolor=FIELD_BG, darkcolor=FIELD_BG,
-			bordercolor=FIELD_BG, selectbackground=FIELD_BG, selectforeground=TEXT)
-		style.map("Field.TCombobox",
-			fieldbackground=[("readonly", FIELD_BG), ("disabled", FIELD_BG)],
-			foreground=[("readonly", TEXT), ("disabled", MUTED)],
-			bordercolor=[("focus", FIELD_BG)],
-			arrowcolor=[("disabled", IDLE)])
-
-		# The list a combobox drops down is a plain listbox in a toplevel of
-		# its own, which no ttk style reaches: it keeps the platform's system
-		# colours, so in the Dark palette it opened as a white panel with
-		# black text. The option database is the only handle on it. This runs
-		# on every rebuild, so a theme switch re-colours the window it is
-		# already showing.
-		for option, value in (
-			("background", CARD_BG),
-			("foreground", TEXT),
-			("selectBackground", ACCENT_SOFT),
-			("selectForeground", TEXT),
-			("font", BASE_FONT),
-			("borderWidth", 0),
-			("highlightThickness", 0),
-			("relief", "flat"),
-		):
-			self.root.option_add(f"*TCombobox*Listbox.{option}", value)
 
 		# The treeview and its headings default to the platform's own colours,
 		# which stay light in the Dark palette unless they are set here.
@@ -1695,10 +1916,7 @@ class ManagerApp:
 
 			field = RoundedField(parent, width=228)
 			field.grid(row=row, column=1, sticky="w", pady=7)
-
-			widget = ttk.Combobox(field, textvariable=var, values=list(spec.choices),
-				state="readonly", style="Field.TCombobox")
-			field.attach(widget)
+			field.attach(SelectControl(field, var, spec.choices))
 
 			getter = lambda var=var, default=spec.default: var.get() or default
 			setter = lambda value, var=var, choices=spec.choices, default=spec.default: var.set(
