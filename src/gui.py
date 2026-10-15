@@ -358,40 +358,60 @@ def partition_accounts(names: list[str], excluded_raw: str) -> tuple[list[str], 
 	return farming, skipped
 
 
-def read_profile_email(profile_dir: str) -> str:
-	"""Which Microsoft account a browser profile is signed into, for display.
+def _signed_in_profiles(profile_dir: str) -> dict:
+	"""The user-data-dir's `Local State` info_cache, or an empty dict.
 
-	Read from the profile's own files rather than guessed from its folder name:
-	`Preferences` records `account_info` once signed in, and the user-data-dir's
-	`Local State` records the name sooner. Any failure - the profile not being
-	created yet, or a file mid-write - falls back to a note, never an error.
+	Keyed by browser profile directory ("Default", "Profile 1", ...). Each entry
+	carries the `user_name` signed into that browser profile, which is what the
+	bot's `--profile-directory` actually opens.
 	"""
 
 	try:
-		with open(os.path.join(profile_dir, "Default", "Preferences"),
-			encoding="utf-8") as handle:
-			accounts_info = json.load(handle).get("account_info") or []
-
-		for entry in accounts_info:
-			if entry.get("email"):
-				return entry["email"]
+		with open(os.path.join(profile_dir, "Local State"), encoding="utf-8") as handle:
+			return json.load(handle).get("profile", {}).get("info_cache", {}) or {}
 	except (OSError, ValueError):
-		pass
+		return {}
+
+
+def _recorded_accounts(profile_dir: str) -> list:
+	"""The opened profile's `account_info`, or an empty list.
+
+	Every account ever used on the profile is listed here, in no particular
+	order, so the first entry is not necessarily the account signed in now.
+	"""
 
 	try:
-		with open(os.path.join(profile_dir, "Local State"), encoding="utf-8") as handle:
-			cache = json.load(handle).get("profile", {}).get("info_cache", {})
-
-		default = cache.get(accounts.PROFILE_NAME) or {}
-
-		if default.get("user_name"):
-			return default["user_name"]
-
-		for entry in cache.values():
-			if entry.get("user_name"):
-				return entry["user_name"]
+		with open(os.path.join(profile_dir, accounts.PROFILE_NAME, "Preferences"),
+			encoding="utf-8") as handle:
+			return json.load(handle).get("account_info") or []
 	except (OSError, ValueError):
-		pass
+		return []
+
+
+def read_profile_email(profile_dir: str) -> str:
+	"""Which Microsoft account a browser profile is signed into, for display.
+
+	Read from the profile's own files rather than guessed from its folder name.
+	The signed-in account wins over the recorded list: `account_info` keeps
+	every account ever added to the profile, so its first entry can be an older,
+	personal one that is not the account actually farming. Any failure - the
+	profile not being created yet, or a file mid-write - falls back to a note,
+	never an error.
+	"""
+
+	signed_in = _signed_in_profiles(profile_dir)
+	opened = signed_in.get(accounts.PROFILE_NAME) or {}
+
+	if opened.get("user_name"):
+		return opened["user_name"]
+
+	for entry in _recorded_accounts(profile_dir):
+		if entry.get("email"):
+			return entry["email"]
+
+	for entry in signed_in.values():
+		if entry.get("user_name"):
+			return entry["user_name"]
 
 	return "not signed in" if os.path.isdir(profile_dir) else "no folder yet"
 

@@ -137,6 +137,20 @@ class TestReadProfileEmail(unittest.TestCase):
 
 		self.assertEqual(gui.read_profile_email(str(self.profile)), "someone@outlook.com")
 
+	def test_signed_in_account_wins_over_an_older_recorded_one(self):
+		# account_info keeps every account ever added to the profile, in no
+		# particular order, so its first entry can be an older personal account
+		# that is not the one actually farming. The profile's sign-in wins.
+		(self.profile / "Default").mkdir()
+		(self.profile / "Default" / "Preferences").write_text(
+			'{"account_info": [{"email": "old@outlook.com"},'
+			' {"email": "farmer@outlook.com"}]}', encoding="utf-8")
+		(self.profile / "Local State").write_text(
+			'{"profile": {"info_cache": {"Default": {"user_name": "farmer@outlook.com"}}}}',
+			encoding="utf-8")
+
+		self.assertEqual(gui.read_profile_email(str(self.profile)), "farmer@outlook.com")
+
 	def test_falls_back_to_local_state_when_preferences_has_no_account(self):
 		(self.profile / "Local State").write_text(
 			'{"profile": {"info_cache": {"Default": {"user_name": "other@outlook.com"}}}}',
