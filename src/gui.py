@@ -210,6 +210,7 @@ TITLE_FONT = (FONT_FAMILY, 16, "bold")
 SUBTITLE_FONT = (FONT_FAMILY, 9)
 SECTION_FONT = (FONT_FAMILY, 11, "bold")
 HEADLINE_FONT = (FONT_FAMILY, 13, "bold")
+EYEBROW_FONT = (FONT_FAMILY, 8, "bold")
 MONO_FONT = ("Consolas", 9)
 
 # The spacing scale the layout is built from, so margins line up instead of
@@ -217,7 +218,7 @@ MONO_FONT = ("Consolas", 9)
 GAP = 12
 PAGE_PAD = 20
 CARD_PAD = 18
-NAV_HEIGHT = 40
+NAV_HEIGHT = 42
 
 # How many console lines to keep before dropping the oldest. The log of a run
 # is useful, an unbounded one is a memory leak that also gets slower to draw.
@@ -613,6 +614,56 @@ class PillButton(tk.Canvas):
 			self.command()
 
 
+class RoundedField(tk.Frame):
+	"""A rounded surround for a single-line text or choice field.
+
+	ttk entries and comboboxes are square, which reads as unfinished beside
+	the rounded cards and buttons. This draws the rounded border and seats a
+	borderless widget inside it, and lights the border while the field has
+	focus.
+	"""
+
+	RADIUS = 8
+	PAD_X = 11
+	HEIGHT = 34
+
+	def __init__(self, parent: tk.Misc, width: int = 1, **kwargs):
+		super().__init__(parent, bg=CARD_BG, width=width, height=self.HEIGHT,
+			bd=0, highlightthickness=0, **kwargs)
+
+		self._focused = False
+		self._face = tk.Canvas(self, bg=CARD_BG, highlightthickness=0, bd=0)
+		self._face.place(x=0, y=0, relwidth=1, relheight=1)
+		self._face.bind("<Configure>", self._paint)
+
+	def attach(self, widget: tk.Widget) -> tk.Widget:
+		"""Seat `widget` inside the field, leaving room for the rounded edge."""
+
+		widget.place(relx=0, rely=0.5, anchor="w", x=self.PAD_X, relwidth=1,
+			width=-2 * self.PAD_X, height=self.HEIGHT - 12)
+		widget.bind("<FocusIn>", self._focus_in, add="+")
+		widget.bind("<FocusOut>", self._focus_out, add="+")
+
+		return widget
+
+	def _focus_in(self, _event) -> None:
+		self._focused = True
+		self._paint()
+
+	def _focus_out(self, _event) -> None:
+		self._focused = False
+		self._paint()
+
+	def _paint(self, _event=None) -> None:
+		width = self._face.winfo_width()
+		height = self._face.winfo_height()
+
+		self._face.delete("all")
+		_round_rect(self._face, 0.5, 0.5, width - 0.5, height - 0.5,
+			self.RADIUS, fill=INPUT_BG,
+			outline=ACCENT if self._focused else INPUT_BORDER, width=1)
+
+
 class ToggleSwitch(tk.Canvas):
 	"""A small sliding switch bound to a BooleanVar.
 
@@ -796,31 +847,36 @@ class ManagerApp:
 		style.configure("Value.TLabel", background=CARD_BG, foreground=TEXT,
 			font=BOLD_FONT)
 
-		style.configure("TEntry", fieldbackground=INPUT_BG, background=INPUT_BG,
-			foreground=TEXT, bordercolor=INPUT_BORDER, lightcolor=INPUT_BORDER,
-			darkcolor=INPUT_BORDER, insertcolor=TEXT, padding=6,
-			selectbackground=ACCENT, selectforeground="#ffffff")
-		style.map("TEntry", bordercolor=[("focus", ACCENT)])
+		# Inside a RoundedField the entry draws no chrome of its own; the field
+		# paints the border, so everything in the window shares one round shape.
+		style.configure("Field.TEntry", borderwidth=0, relief="flat",
+			fieldbackground=INPUT_BG, background=INPUT_BG, foreground=TEXT,
+			insertcolor=TEXT, padding=0, selectbackground=ACCENT,
+			selectforeground="#ffffff")
+		style.map("Field.TEntry",
+			fieldbackground=[("disabled", INPUT_BG)],
+			foreground=[("disabled", MUTED)])
 
-		style.configure("TCombobox", fieldbackground=INPUT_BG, background=INPUT_BG,
-			foreground=TEXT, bordercolor=INPUT_BORDER, lightcolor=INPUT_BORDER,
-			darkcolor=INPUT_BORDER, arrowcolor=MUTED, padding=5,
-			selectbackground=INPUT_BG, selectforeground=TEXT)
-		style.map("TCombobox",
-			bordercolor=[("focus", ACCENT)],
-			fieldbackground=[("readonly", INPUT_BG)],
-			foreground=[("readonly", TEXT)])
+		style.configure("Field.TCombobox", borderwidth=0, relief="flat",
+			fieldbackground=INPUT_BG, background=INPUT_BG, foreground=TEXT,
+			arrowcolor=MUTED, padding=0, lightcolor=INPUT_BG, darkcolor=INPUT_BG,
+			bordercolor=INPUT_BG, selectbackground=INPUT_BG, selectforeground=TEXT)
+		style.map("Field.TCombobox",
+			fieldbackground=[("readonly", INPUT_BG), ("disabled", INPUT_BG)],
+			foreground=[("readonly", TEXT), ("disabled", MUTED)],
+			bordercolor=[("focus", INPUT_BG)],
+			arrowcolor=[("disabled", IDLE)])
 
 		# The treeview and its headings default to the platform's own colours,
 		# which stay light in the Dark palette unless they are set here.
 		style.configure("Treeview", background=CARD_BG, fieldbackground=CARD_BG,
 			foreground=TEXT, bordercolor=CARD_BORDER, lightcolor=CARD_BG,
-			darkcolor=CARD_BG, borderwidth=1, relief="solid", rowheight=30,
+			darkcolor=CARD_BG, borderwidth=1, relief="solid", rowheight=32,
 			font=BASE_FONT)
 		style.configure("Treeview.Heading", background=HEADING_BG,
 			foreground=MUTED, font=BOLD_FONT, relief="flat", borderwidth=0,
 			bordercolor=CARD_BORDER, lightcolor=HEADING_BG, darkcolor=HEADING_BG,
-			padding=(10, 8))
+			padding=(12, 9))
 		style.map("Treeview.Heading", background=[("active", HEADING_BG)])
 		style.map("Treeview",
 			background=[("selected", ACCENT_SOFT)],
@@ -845,9 +901,11 @@ class ManagerApp:
 		self.nav = {}
 		self.fields = {}
 		self._nav_hovered = None
+		self._hovered_row = None
 
 		self.root.configure(bg=APP_BG)
 		self._configure_style()
+		self._set_window_icon()
 		self._build_header()
 		self._build_body()
 		self._build_status_bar()
@@ -900,11 +958,16 @@ class ManagerApp:
 		header = tk.Frame(self.root, bg=HEADER_BG)
 		header.pack(fill="x", side="top")
 
-		inner = tk.Frame(header, bg=HEADER_BG, padx=24, pady=18)
+		inner = tk.Frame(header, bg=HEADER_BG, padx=24, pady=16)
 		inner.pack(fill="x")
 
+		mark = tk.Canvas(inner, width=40, height=40, bg=HEADER_BG,
+			highlightthickness=0, bd=0)
+		mark.pack(side="left", anchor="w")
+		self._draw_brand(mark)
+
 		titles = tk.Frame(inner, bg=HEADER_BG)
-		titles.pack(side="left", anchor="w")
+		titles.pack(side="left", anchor="w", padx=(14, 0))
 
 		tk.Label(titles, text="Rewards Farmer", bg=HEADER_BG, fg=TEXT,
 			font=TITLE_FONT).pack(anchor="w")
@@ -913,10 +976,66 @@ class ManagerApp:
 
 		self.status_canvas = tk.Canvas(inner, height=28, bg=HEADER_BG,
 			highlightthickness=0, bd=0)
-		self.status_canvas.pack(side="right", anchor="e", padx=(0, 14))
+		self.status_canvas.pack(side="right", anchor="e", padx=(0, 4))
 		self._draw_status()
 
 		tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", side="top")
+
+	def _draw_brand(self, canvas: tk.Canvas) -> None:
+		"""The app mark: a rounded accent tile with a run glyph on it."""
+
+		_round_rect(canvas, 0, 0, 40, 40, 11, fill=ACCENT, outline="")
+		canvas.create_polygon(16, 12, 16, 28, 29, 20, fill="#ffffff", outline="")
+
+	def _set_window_icon(self) -> None:
+		"""Put the same mark on the title bar and the taskbar.
+
+		Tk falls back to its own feather, which makes the window look
+		unfinished, and this way the icon ships with no binary asset. The tile
+		is painted a pixel at a time into a PhotoImage, then the corners
+		outside the rounded edge are cleared so they come out transparent.
+		"""
+
+		size, radius = 32, 9
+		image = tk.PhotoImage(width=size, height=size)
+		image.put(ACCENT, to=(0, 0, size, size))
+
+		def in_tile(x: float, y: float) -> bool:
+			width = size
+			if radius <= x <= width - radius or radius <= y <= width - radius:
+				return True
+
+			corner_x = radius if x < radius else width - radius
+			corner_y = radius if y < radius else width - radius
+
+			return ((x - corner_x) ** 2 + (y - corner_y) ** 2) <= radius ** 2
+
+		def in_glyph(x: float, y: float) -> bool:
+			# The play triangle from _draw_brand, scaled to this tile.
+			triangle = ((13, 10), (13, 22), (23, 16))
+
+			def side(a, b):
+				return (x - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (y - b[1])
+
+			edges = [side(triangle[i], triangle[(i + 1) % 3]) for i in range(3)]
+
+			return all(edge >= 0 for edge in edges) or all(edge <= 0 for edge in edges)
+
+		for y in range(size):
+			for x in range(size):
+				center = (x + 0.5, y + 0.5)
+
+				if in_glyph(*center):
+					image.put("#ffffff", to=(x, y, x + 1, y + 1))
+				elif not in_tile(*center):
+					image.transparency_set(x, y, True)
+
+		self._icon = image
+
+		try:
+			self.root.iconphoto(True, image)
+		except tk.TclError:
+			pass
 
 	def _draw_status(self) -> None:
 		"""The dot-and-label pill in the header.
@@ -969,7 +1088,7 @@ class ManagerApp:
 		tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
 
 		tk.Label(sidebar, text="MENU", bg=SIDEBAR_BG, fg=IDLE, anchor="w",
-			font=(FONT_FAMILY, 8, "bold"), padx=24).pack(fill="x", pady=(20, 8))
+			font=EYEBROW_FONT, padx=24).pack(fill="x", pady=(20, 8))
 
 		nav = tk.Frame(sidebar, bg=SIDEBAR_BG)
 		nav.pack(fill="x")
@@ -1002,7 +1121,7 @@ class ManagerApp:
 		# than the square block a coloured frame gives.
 		item = tk.Canvas(parent, bg=SIDEBAR_BG, height=NAV_HEIGHT,
 			highlightthickness=0, bd=0, cursor="hand2")
-		item.pack(fill="x", padx=10)
+		item.pack(fill="x", padx=12, pady=(0, 2))
 
 		self.nav[name] = item
 
@@ -1017,19 +1136,24 @@ class ManagerApp:
 
 		width = canvas.winfo_width()
 		if width < 2:
-			width = 196
+			width = 192
 
 		height = NAV_HEIGHT
 		selected = name == self.current_view
 		hovered = self._nav_hovered == name
 
 		if selected or hovered:
-			_round_rect(canvas, 1, 3, width - 1, height - 3, 9,
+			_round_rect(canvas, 0, 2, width, height - 2, 9,
 				fill=NAV_SELECTED if selected else NAV_HOVER, outline="")
 
+		if selected:
+			# A short accent bar, the way a real app flags the current page.
+			_round_rect(canvas, 4, height / 2 - 9, 7, height / 2 + 9, 1.5,
+				fill=ACCENT, outline="")
+
 		color = ACCENT if selected else (TEXT if hovered else MUTED)
-		self._draw_nav_icon(canvas, name, 22, height / 2, color)
-		canvas.create_text(46, height / 2, text=name, anchor="w", fill=color,
+		self._draw_nav_icon(canvas, name, 30, height / 2, color)
+		canvas.create_text(54, height / 2, text=name, anchor="w", fill=color,
 			font=BOLD_FONT if selected else BASE_FONT)
 
 	def _draw_nav_icon(self, canvas: tk.Canvas, name: str, cx: float, cy: float,
@@ -1037,15 +1161,16 @@ class ManagerApp:
 		"""A small glyph per page, drawn rather than shipped as an image."""
 
 		if name == "Run":
-			canvas.create_polygon(cx - 4, cy - 7, cx - 4, cy + 7, cx + 7, cy,
+			canvas.create_polygon(cx - 5, cy - 7, cx - 5, cy + 7, cx + 6, cy,
 				fill=color, outline="")
 		elif name == "Accounts":
 			canvas.create_oval(cx - 4, cy - 8, cx + 4, cy, fill=color, outline="")
 			canvas.create_arc(cx - 8, cy - 1, cx + 8, cy + 15, start=0, extent=180,
 				style="chord", fill=color, outline="")
 		else:
-			for offset, knob in ((-6, 3), (0, -3), (6, 4)):
-				canvas.create_line(cx - 7, cy + offset, cx + 7, cy + offset,
+			# Three sliders, the usual shorthand for settings.
+			for offset, knob in ((-6, -3), (1, 4), (8, -1)):
+				canvas.create_line(cx - 8, cy + offset, cx + 8, cy + offset,
 					fill=color, width=2)
 				canvas.create_oval(cx + knob - 3, cy + offset - 3, cx + knob + 3,
 					cy + offset + 3, fill=color, outline="")
@@ -1169,9 +1294,15 @@ class ManagerApp:
 		self.accounts_tree.tag_configure("odd", background=ROW_ALT)
 		self.accounts_tree.tag_configure("even", background=CARD_BG)
 		self.accounts_tree.tag_configure("skipped", foreground=MUTED)
+		# Configured last, so its background wins over the stripe while the
+		# pointer rests on a row. It only sets a background, so an excluded
+		# row still keeps the muted text underneath.
+		self.accounts_tree.tag_configure("hover", background=NAV_HOVER)
 		self.accounts_tree.grid(row=2, column=0, sticky="nsew")
 		self.accounts_tree.bind("<Double-1>", self._toggle_row)
 		self.accounts_tree.bind("<space>", self._toggle_selected_rows)
+		self.accounts_tree.bind("<Motion>", self._hover_row)
+		self.accounts_tree.bind("<Leave>", lambda _event: self._set_row_hover(None))
 
 		tree_scroll = ttk.Scrollbar(card, orient="vertical",
 			command=self.accounts_tree.yview)
@@ -1189,8 +1320,13 @@ class ManagerApp:
 		ttk.Label(add_row, text="New profile", style="Card.TLabel").grid(
 			row=0, column=0, sticky="w", padx=(0, 10))
 		self.new_account_var = tk.StringVar()
-		entry = ttk.Entry(add_row, textvariable=self.new_account_var)
-		entry.grid(row=0, column=1, sticky="ew")
+
+		field = RoundedField(add_row)
+		field.grid(row=0, column=1, sticky="ew")
+
+		entry = ttk.Entry(field, textvariable=self.new_account_var,
+			style="Field.TEntry")
+		field.attach(entry)
 		entry.bind("<Return>", lambda _event: self.add_account())
 		PillButton(add_row, text="Add", variant="accent",
 			command=self.add_account).grid(row=0, column=2, padx=(8, 0))
@@ -1359,17 +1495,27 @@ class ManagerApp:
 
 		elif spec.kind == "choice":
 			var = tk.StringVar(value=current if current in spec.choices else spec.default)
-			widget = ttk.Combobox(parent, textvariable=var, values=list(spec.choices),
-				state="readonly", width=28)
-			widget.grid(row=row, column=1, sticky="w", pady=7)
+
+			field = RoundedField(parent, width=228)
+			field.grid(row=row, column=1, sticky="w", pady=7)
+
+			widget = ttk.Combobox(field, textvariable=var, values=list(spec.choices),
+				state="readonly", style="Field.TCombobox")
+			field.attach(widget)
+
 			getter = lambda var=var, default=spec.default: var.get() or default
 			setter = lambda value, var=var, choices=spec.choices, default=spec.default: var.set(
 				value if value in choices else default)
 
 		else:
 			var = tk.StringVar(value=current)
-			widget = ttk.Entry(parent, textvariable=var)
-			widget.grid(row=row, column=1, sticky="ew", pady=7)
+
+			field = RoundedField(parent)
+			field.grid(row=row, column=1, sticky="ew", pady=7)
+
+			widget = ttk.Entry(field, textvariable=var, style="Field.TEntry")
+			field.attach(widget)
+
 			getter = lambda var=var: var.get().strip()
 			setter = lambda value, var=var: var.set(value)
 
@@ -1447,6 +1593,8 @@ class ManagerApp:
 
 		for item in self.accounts_tree.get_children():
 			self.accounts_tree.delete(item)
+
+		self._hovered_row = None
 
 		for index, name in enumerate(self.accounts):
 			skipped = name in self.excluded
@@ -1650,6 +1798,27 @@ class ManagerApp:
 
 		if item:
 			self._toggle_items([item])
+
+	def _hover_row(self, event) -> None:
+		"""Light the row under the pointer, the way a real list behaves."""
+		self._set_row_hover(self.accounts_tree.identify_row(event.y) or None)
+
+	def _set_row_hover(self, row: str | None) -> None:
+		if row == self._hovered_row:
+			return
+
+		previous = self._hovered_row
+		self._hovered_row = row
+
+		if previous and self.accounts_tree.exists(previous):
+			tags = [tag for tag in self.accounts_tree.item(previous, "tags")
+				if tag != "hover"]
+			self.accounts_tree.item(previous, tags=tags)
+
+		if row and self.accounts_tree.exists(row):
+			tags = list(self.accounts_tree.item(row, "tags"))
+			if "hover" not in tags:
+				self.accounts_tree.item(row, tags=tags + ["hover"])
 
 	def _toggle_selected_rows(self, _event) -> str:
 		"""Space: flip every selected row, then stop Tk's default handling."""
