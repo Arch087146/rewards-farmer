@@ -567,9 +567,13 @@ class PillButton(tk.Canvas):
 	PAD_X = 16
 
 	def __init__(self, parent: tk.Misc, text: str = "", command=None,
-		variant: str = "default", surround: str = CARD_BG, **kwargs):
+		variant: str = "default", surround: str | None = None, **kwargs):
+		# `surround` is resolved here rather than in the default list: a
+		# default is bound once at import, which would freeze the Light
+		# palette's white into every button built after a switch to Dark and
+		# leave a pale halo showing through the corners of the pill.
 		super().__init__(parent, height=self.HEIGHT, highlightthickness=0, bd=0,
-			bg=surround, cursor="hand2", **kwargs)
+			bg=CARD_BG if surround is None else surround, cursor="hand2", **kwargs)
 
 		self.command = command
 		self.variant = variant
@@ -1050,6 +1054,24 @@ class ManagerApp:
 			foreground=[("readonly", TEXT), ("disabled", MUTED)],
 			bordercolor=[("focus", FIELD_BG)],
 			arrowcolor=[("disabled", IDLE)])
+
+		# The list a combobox drops down is a plain listbox in a toplevel of
+		# its own, which no ttk style reaches: it keeps the platform's system
+		# colours, so in the Dark palette it opened as a white panel with
+		# black text. The option database is the only handle on it. This runs
+		# on every rebuild, so a theme switch re-colours the window it is
+		# already showing.
+		for option, value in (
+			("background", CARD_BG),
+			("foreground", TEXT),
+			("selectBackground", ACCENT_SOFT),
+			("selectForeground", TEXT),
+			("font", BASE_FONT),
+			("borderWidth", 0),
+			("highlightThickness", 0),
+			("relief", "flat"),
+		):
+			self.root.option_add(f"*TCombobox*Listbox.{option}", value)
 
 		# The treeview and its headings default to the platform's own colours,
 		# which stay light in the Dark palette unless they are set here.
