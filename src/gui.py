@@ -31,6 +31,7 @@ from dataclasses import dataclass, field as dataclass_field
 from tkinter import filedialog, messagebox, ttk
 
 import dotenv
+from PIL import Image, ImageDraw, ImageTk
 
 import accounts
 import browser
@@ -710,6 +711,10 @@ class ToggleSwitch(tk.Canvas):
 	setting with no visible label next to it, which is easy to read as broken.
 	This draws the familiar track-and-knob, and slides the knob so a change is
 	legible at a glance.
+
+	Tk paints canvas shapes with no anti-aliasing, which leaves curves this
+	small looking stepped. The switch is drawn with Pillow at a larger scale
+	and shrunk back down instead, so its edges soften into the card.
 	"""
 
 	WIDTH = 46
@@ -718,6 +723,7 @@ class ToggleSwitch(tk.Canvas):
 	PAD = 3
 	EASE = 0.35
 	SNAP = 0.02
+	SAMPLE = 4
 
 	def __init__(self, parent, variable: tk.BooleanVar, **kwargs):
 		super().__init__(parent, width=self.WIDTH, height=self.HEIGHT, bd=0,
@@ -725,33 +731,64 @@ class ToggleSwitch(tk.Canvas):
 		self.variable = variable
 		self._position = 1.0 if variable.get() else 0.0
 		self._animation: str | None = None
+		self._frames: dict[tuple, ImageTk.PhotoImage] = {}
+		self._face = self.create_image(0, 0, anchor="nw")
 
 		self.variable.trace_add("write", self._animate)
 		self.bind("<Button-1>", self._toggle)
 		self.bind("<Destroy>", self._cancel)
 		self._draw()
 
-	def _draw(self) -> None:
-		self.delete("all")
-		on = self.variable.get()
+	def _centre(self, position: float) -> float:
+		"""Where the knob sits for a slide position between 0.0 and 1.0."""
 
-		# A capsule, not a rounded rect: the track is nearly as tall as it is
-		# round, so the corner arcs have to meet the straight edges exactly.
-		_pill(self, 0, 0, self.WIDTH, self.HEIGHT,
-			fill=ACCENT if on else TRACK_OFF, outline="")
-
-		# The knob follows the animation, not the variable, so a flip looks
-		# like a slide rather than a jump. It stays a plain white disc: the
-		# hairline ring it used to carry read as a wireframe, and the gap to
-		# the track edge does the same job more quietly.
 		radius = self.KNOB / 2
-		centre_y = self.HEIGHT / 2
 		left = self.PAD + radius
 		right = self.WIDTH - self.PAD - radius
-		centre_x = left + (right - left) * self._position
 
-		self.create_oval(centre_x - radius, centre_y - radius,
-			centre_x + radius, centre_y + radius, fill="#ffffff", outline="")
+		return left + (right - left) * position
+
+	def _render(self, on: bool, centre: float) -> Image.Image:
+		"""Paint the switch oversized, then shrink it to soften the edges."""
+
+		scale = self.SAMPLE
+		image = Image.new("RGB", (self.WIDTH * scale, self.HEIGHT * scale),
+			CARD_BG)
+		draw = ImageDraw.Draw(image)
+
+		draw.rounded_rectangle(
+			(0, 0, self.WIDTH * scale - 1, self.HEIGHT * scale - 1),
+			radius=self.HEIGHT * scale / 2,
+			fill=ACCENT if on else TRACK_OFF)
+
+		# The knob stays a plain white disc: the hairline ring it used to
+		# carry read as a wireframe, and the gap to the track edge does the
+		# same job more quietly.
+		radius = self.KNOB * scale / 2
+		centre_x = centre * scale
+		centre_y = self.HEIGHT * scale / 2
+
+		draw.ellipse((centre_x - radius, centre_y - radius,
+			centre_x + radius, centre_y + radius), fill="#ffffff")
+
+		return image.resize((self.WIDTH, self.HEIGHT),
+			Image.Resampling.LANCZOS)
+
+	def _draw(self) -> None:
+		on = self.variable.get()
+
+		# The knob follows the animation, not the variable, so a flip looks
+		# like a slide rather than a jump. Whole-pixel centres keep the cache
+		# to a couple of dozen frames and stop the disc half-landing.
+		centre = round(self._centre(self._position))
+		key = (on, centre, ACCENT, TRACK_OFF, CARD_BG)
+
+		photo = self._frames.get(key)
+		if photo is None:
+			photo = ImageTk.PhotoImage(self._render(on, centre), master=self)
+			self._frames[key] = photo
+
+		self.itemconfig(self._face, image=photo)
 
 	def _animate(self, *_args) -> None:
 		self._cancel()
