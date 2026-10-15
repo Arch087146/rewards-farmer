@@ -24,6 +24,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 from dataclasses import dataclass, field as dataclass_field
 from tkinter import filedialog, messagebox, ttk
 
@@ -46,26 +47,36 @@ LOG_DATE_FORMAT = "%H:%M:%S"
 # THEME_ENV_KEY, which the bot itself never reads - it is a window preference
 # only, kept with the rest of the window's state so there is no second file.
 LIGHT_PALETTE = {
-	"APP_BG": "#f4f5f7",
+	"APP_BG": "#f5f6f8",
 	"CARD_BG": "#ffffff",
+	"CARD_BORDER": "#e5e8ec",
 	"HEADER_BG": "#ffffff",
-	"BORDER": "#e2e4e8",
+	"BORDER": "#e5e8ec",
 	"ACCENT": "#0f6cbd",
 	"ACCENT_ACTIVE": "#0b5a9e",
 	"ACCENT_DISABLED": "#a9c8e6",
-	"TEXT": "#1f1f1f",
-	"MUTED": "#61656b",
-	"DANGER": "#c42b1c",
-	"SUCCESS": "#107c10",
-	"IDLE": "#8a8f98",
+	"ACCENT_SOFT": "#e8f1fb",
+	"TEXT": "#1b1d21",
+	"MUTED": "#5f6673",
+	"DANGER": "#b42318",
+	"DANGER_SOFT": "#fdecea",
+	"SUCCESS": "#0f7b34",
+	"IDLE": "#98a0ab",
 	"SIDEBAR_BG": "#ffffff",
 	"NAV_HOVER": "#f2f4f7",
 	"NAV_SELECTED": "#e8f1fb",
-	"TRACK_OFF": "#c9ccd1",
-	"BTN_HOVER": "#eceef1",
+	"TRACK_OFF": "#cbd0d6",
+	"BTN_HOVER": "#eef0f3",
 	"GHOST_HOVER": "#eef4fb",
 	"INPUT_BG": "#ffffff",
+	"INPUT_BORDER": "#d5d9df",
+	"HEADING_BG": "#fafbfc",
+	"ROW_ALT": "#fafbfc",
+	"PILL_BG": "#f2f4f7",
+	"SCROLL_THUMB": "#cfd4da",
+	"SCROLL_HOVER": "#b6bcc4",
 	"CONSOLE_BG": "#ffffff",
+	"CONSOLE_BORDER": "#e5e8ec",
 	"CONSOLE_FG": "#24292f",
 	"CONSOLE_ERROR": "#b3261e",
 	"CONSOLE_WARNING": "#8a6100",
@@ -74,26 +85,36 @@ LIGHT_PALETTE = {
 }
 
 DARK_PALETTE = {
-	"APP_BG": "#1b1d21",
-	"CARD_BG": "#25272b",
-	"HEADER_BG": "#202225",
-	"BORDER": "#3a3d42",
+	"APP_BG": "#17181b",
+	"CARD_BG": "#212327",
+	"CARD_BORDER": "#31343a",
+	"HEADER_BG": "#1c1e21",
+	"BORDER": "#31343a",
 	"ACCENT": "#4c9be8",
-	"ACCENT_ACTIVE": "#3d84cc",
+	"ACCENT_ACTIVE": "#67acef",
 	"ACCENT_DISABLED": "#39516b",
-	"TEXT": "#e8eaed",
-	"MUTED": "#9aa0a6",
-	"DANGER": "#f2857c",
-	"SUCCESS": "#7bd88f",
-	"IDLE": "#8a8f98",
-	"SIDEBAR_BG": "#202225",
-	"NAV_HOVER": "#2a2d31",
-	"NAV_SELECTED": "#2f3a46",
-	"TRACK_OFF": "#54585e",
-	"BTN_HOVER": "#32353a",
-	"GHOST_HOVER": "#2f3a46",
-	"INPUT_BG": "#2b2d31",
-	"CONSOLE_BG": "#141517",
+	"ACCENT_SOFT": "#26313d",
+	"TEXT": "#e9ebee",
+	"MUTED": "#99a0aa",
+	"DANGER": "#f0857c",
+	"DANGER_SOFT": "#3a2624",
+	"SUCCESS": "#74d68a",
+	"IDLE": "#7f868f",
+	"SIDEBAR_BG": "#1c1e21",
+	"NAV_HOVER": "#26292e",
+	"NAV_SELECTED": "#26313d",
+	"TRACK_OFF": "#4a4e55",
+	"BTN_HOVER": "#2c2f35",
+	"GHOST_HOVER": "#26313d",
+	"INPUT_BG": "#26282d",
+	"INPUT_BORDER": "#3a3e45",
+	"HEADING_BG": "#26282c",
+	"ROW_ALT": "#26282c",
+	"PILL_BG": "#26292e",
+	"SCROLL_THUMB": "#454951",
+	"SCROLL_HOVER": "#565b64",
+	"CONSOLE_BG": "#101113",
+	"CONSOLE_BORDER": "#2b2e33",
 	"CONSOLE_FG": "#d7dae0",
 	"CONSOLE_ERROR": "#ff9c9c",
 	"CONSOLE_WARNING": "#ffd27d",
@@ -114,14 +135,17 @@ EXCLUDE_ENV_KEY = "GUI_EXCLUDED_ACCOUNTS"
 # every widget built after a switch picks the new colours up.
 APP_BG = LIGHT_PALETTE["APP_BG"]
 CARD_BG = LIGHT_PALETTE["CARD_BG"]
+CARD_BORDER = LIGHT_PALETTE["CARD_BORDER"]
 HEADER_BG = LIGHT_PALETTE["HEADER_BG"]
 BORDER = LIGHT_PALETTE["BORDER"]
 ACCENT = LIGHT_PALETTE["ACCENT"]
 ACCENT_ACTIVE = LIGHT_PALETTE["ACCENT_ACTIVE"]
 ACCENT_DISABLED = LIGHT_PALETTE["ACCENT_DISABLED"]
+ACCENT_SOFT = LIGHT_PALETTE["ACCENT_SOFT"]
 TEXT = LIGHT_PALETTE["TEXT"]
 MUTED = LIGHT_PALETTE["MUTED"]
 DANGER = LIGHT_PALETTE["DANGER"]
+DANGER_SOFT = LIGHT_PALETTE["DANGER_SOFT"]
 SUCCESS = LIGHT_PALETTE["SUCCESS"]
 IDLE = LIGHT_PALETTE["IDLE"]
 SIDEBAR_BG = LIGHT_PALETTE["SIDEBAR_BG"]
@@ -131,7 +155,14 @@ TRACK_OFF = LIGHT_PALETTE["TRACK_OFF"]
 BTN_HOVER = LIGHT_PALETTE["BTN_HOVER"]
 GHOST_HOVER = LIGHT_PALETTE["GHOST_HOVER"]
 INPUT_BG = LIGHT_PALETTE["INPUT_BG"]
+INPUT_BORDER = LIGHT_PALETTE["INPUT_BORDER"]
+HEADING_BG = LIGHT_PALETTE["HEADING_BG"]
+ROW_ALT = LIGHT_PALETTE["ROW_ALT"]
+PILL_BG = LIGHT_PALETTE["PILL_BG"]
+SCROLL_THUMB = LIGHT_PALETTE["SCROLL_THUMB"]
+SCROLL_HOVER = LIGHT_PALETTE["SCROLL_HOVER"]
 CONSOLE_BG = LIGHT_PALETTE["CONSOLE_BG"]
+CONSOLE_BORDER = LIGHT_PALETTE["CONSOLE_BORDER"]
 CONSOLE_FG = LIGHT_PALETTE["CONSOLE_FG"]
 CONSOLE_ERROR = LIGHT_PALETTE["CONSOLE_ERROR"]
 CONSOLE_WARNING = LIGHT_PALETTE["CONSOLE_WARNING"]
@@ -168,11 +199,24 @@ def detect_system_theme() -> str:
 	except Exception:
 		return "Light"
 
-BASE_FONT = ("Segoe UI", 10)
-BOLD_FONT = ("Segoe UI", 10, "bold")
-TITLE_FONT = ("Segoe UI", 15, "bold")
-SECTION_FONT = ("Segoe UI", 11, "bold")
+# One family and a small size scale, so the window reads as a single piece
+# rather than a pile of default widgets.
+FONT_FAMILY = "Segoe UI"
+BASE_FONT = (FONT_FAMILY, 10)
+SMALL_FONT = (FONT_FAMILY, 9)
+BOLD_FONT = (FONT_FAMILY, 10, "bold")
+TITLE_FONT = (FONT_FAMILY, 16, "bold")
+SUBTITLE_FONT = (FONT_FAMILY, 9)
+SECTION_FONT = (FONT_FAMILY, 11, "bold")
+HEADLINE_FONT = (FONT_FAMILY, 13, "bold")
 MONO_FONT = ("Consolas", 9)
+
+# The spacing scale the layout is built from, so margins line up instead of
+# being a fresh guess per widget.
+GAP = 12
+PAGE_PAD = 20
+CARD_PAD = 18
+NAV_HEIGHT = 40
 
 # How many console lines to keep before dropping the oldest. The log of a run
 # is useful, an unbounded one is a memory leak that also gets slower to draw.
@@ -437,6 +481,19 @@ def _round_rect(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float,
 	return canvas.create_polygon(points, smooth=True, **kwargs)
 
 
+def _card(parent: tk.Misc, padx: int = CARD_PAD, pady: int = CARD_PAD) -> tk.Frame:
+	"""A flat panel with a hairline border, the window's basic surface.
+
+	A `tk.Frame` rather than a themed one because its `highlightthickness`
+	gives a real one-pixel border in any palette, which is what makes a card
+	read as raised instead of as a white rectangle floating on grey.
+	"""
+
+	return tk.Frame(parent, bg=CARD_BG, bd=0, highlightthickness=1,
+		highlightbackground=CARD_BORDER, highlightcolor=CARD_BORDER,
+		padx=padx, pady=pady)
+
+
 class ToggleSwitch(tk.Canvas):
 	"""A small sliding switch bound to a BooleanVar.
 
@@ -529,11 +586,16 @@ class ManagerApp:
 	def _configure_window(self) -> None:
 		self.root.title("Rewards Farmer")
 		self.root.configure(bg=APP_BG)
-		self.root.minsize(780, 540)
+		self.root.minsize(860, 560)
 
-		width, height = 940, 680
+		width, height = 1000, 720
 		screen_w = self.root.winfo_screenwidth()
 		screen_h = self.root.winfo_screenheight()
+
+		# Never open larger than the screen, so the window is never born with
+		# its buttons off the edge.
+		width = min(width, max(860, screen_w - 80))
+		height = min(height, max(560, screen_h - 80))
 		x = max(0, (screen_w - width) // 2)
 		y = max(0, (screen_h - height) // 3)
 
@@ -547,64 +609,103 @@ class ManagerApp:
 		except tk.TclError:
 			pass
 
-		style.configure(".", background=APP_BG, foreground=TEXT, font=BASE_FONT, borderwidth=0)
+		style.configure(".", background=APP_BG, foreground=TEXT, font=BASE_FONT,
+			borderwidth=0, focuscolor=APP_BG)
 		style.configure("TFrame", background=APP_BG)
 		style.configure("Card.TFrame", background=CARD_BG)
 		style.configure("TLabel", background=APP_BG, foreground=TEXT)
 		style.configure("Card.TLabel", background=CARD_BG, foreground=TEXT)
 		style.configure("Muted.TLabel", background=APP_BG, foreground=MUTED)
 		style.configure("CardMuted.TLabel", background=CARD_BG, foreground=MUTED)
-		style.configure("H1.TLabel", background=CARD_BG, foreground=TEXT, font=SECTION_FONT)
-		style.configure("Value.TLabel", background=CARD_BG, foreground=TEXT, font=BOLD_FONT)
+		style.configure("Small.TLabel", background=APP_BG, foreground=MUTED,
+			font=SMALL_FONT)
+		style.configure("CardSmall.TLabel", background=CARD_BG, foreground=MUTED,
+			font=SMALL_FONT)
+		style.configure("H1.TLabel", background=CARD_BG, foreground=TEXT,
+			font=SECTION_FONT)
+		style.configure("Headline.TLabel", background=CARD_BG, foreground=TEXT,
+			font=HEADLINE_FONT)
+		style.configure("Value.TLabel", background=CARD_BG, foreground=TEXT,
+			font=BOLD_FONT)
 
-		style.configure("TButton", font=BASE_FONT, padding=(12, 6), background=CARD_BG,
-			foreground=TEXT, bordercolor=BORDER, focusthickness=0)
+		style.configure("TButton", font=BASE_FONT, padding=(14, 7),
+			background=CARD_BG, foreground=TEXT, bordercolor=BORDER,
+			lightcolor=CARD_BG, darkcolor=CARD_BG, focuscolor=CARD_BG,
+			focusthickness=0, relief="flat")
 		style.map("TButton",
-			background=[("active", BTN_HOVER), ("disabled", CARD_BG)],
-			foreground=[("disabled", MUTED)])
+			background=[("pressed", BTN_HOVER), ("active", BTN_HOVER),
+				("disabled", CARD_BG)],
+			foreground=[("disabled", MUTED)],
+			bordercolor=[("disabled", BORDER)])
 
 		style.configure("Accent.TButton", background=ACCENT, foreground="#ffffff",
-			bordercolor=ACCENT)
+			bordercolor=ACCENT, lightcolor=ACCENT, darkcolor=ACCENT,
+			focuscolor=ACCENT)
 		style.map("Accent.TButton",
-			background=[("active", ACCENT_ACTIVE), ("disabled", ACCENT_DISABLED)],
-			foreground=[("disabled", "#f0f0f0")])
+			background=[("pressed", ACCENT_ACTIVE), ("active", ACCENT_ACTIVE),
+				("disabled", ACCENT_DISABLED)],
+			foreground=[("disabled", "#f0f0f0")],
+			bordercolor=[("disabled", ACCENT_DISABLED)])
 
 		style.configure("Ghost.TButton", background=CARD_BG, foreground=ACCENT,
-			bordercolor=BORDER)
+			bordercolor=BORDER, lightcolor=CARD_BG, darkcolor=CARD_BG,
+			focuscolor=CARD_BG, padding=(10, 7))
 		style.map("Ghost.TButton",
-			background=[("active", GHOST_HOVER)],
-			foreground=[("disabled", MUTED)])
+			background=[("pressed", GHOST_HOVER), ("active", GHOST_HOVER)],
+			foreground=[("disabled", MUTED)],
+			bordercolor=[("disabled", BORDER)])
+
+		style.configure("Danger.TButton", background=CARD_BG, foreground=DANGER,
+			bordercolor=BORDER, lightcolor=CARD_BG, darkcolor=CARD_BG,
+			focuscolor=CARD_BG)
+		style.map("Danger.TButton",
+			background=[("pressed", DANGER_SOFT), ("active", DANGER_SOFT)],
+			foreground=[("disabled", MUTED)],
+			bordercolor=[("disabled", BORDER)])
 
 		style.configure("Header.TButton", background=HEADER_BG, foreground=MUTED,
-			bordercolor=HEADER_BG, padding=(10, 4))
+			bordercolor=BORDER, lightcolor=HEADER_BG, darkcolor=HEADER_BG,
+			focuscolor=HEADER_BG, padding=(12, 5))
 		style.map("Header.TButton",
-			background=[("active", BTN_HOVER)],
+			background=[("pressed", BTN_HOVER), ("active", BTN_HOVER)],
 			foreground=[("active", TEXT)])
 
-		style.configure("TEntry", fieldbackground=INPUT_BG, foreground=TEXT,
-			bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER, padding=4)
+		style.configure("TEntry", fieldbackground=INPUT_BG, background=INPUT_BG,
+			foreground=TEXT, bordercolor=INPUT_BORDER, lightcolor=INPUT_BORDER,
+			darkcolor=INPUT_BORDER, insertcolor=TEXT, padding=6,
+			selectbackground=ACCENT, selectforeground="#ffffff")
 		style.map("TEntry", bordercolor=[("focus", ACCENT)])
 
-		style.configure("TCombobox", fieldbackground=INPUT_BG, foreground=TEXT,
-			background=INPUT_BG, bordercolor=BORDER, arrowcolor=MUTED, padding=4)
-		style.map("TCombobox", bordercolor=[("focus", ACCENT)])
-
-		style.configure("TCheckbutton", background=CARD_BG, foreground=TEXT,
-			focusthickness=0)
-		style.map("TCheckbutton", background=[("active", CARD_BG)])
+		style.configure("TCombobox", fieldbackground=INPUT_BG, background=INPUT_BG,
+			foreground=TEXT, bordercolor=INPUT_BORDER, lightcolor=INPUT_BORDER,
+			darkcolor=INPUT_BORDER, arrowcolor=MUTED, padding=5,
+			selectbackground=INPUT_BG, selectforeground=TEXT)
+		style.map("TCombobox",
+			bordercolor=[("focus", ACCENT)],
+			fieldbackground=[("readonly", INPUT_BG)],
+			foreground=[("readonly", TEXT)])
 
 		# The treeview and its headings default to the platform's own colours,
 		# which stay light in the Dark palette unless they are set here.
 		style.configure("Treeview", background=CARD_BG, fieldbackground=CARD_BG,
-			foreground=TEXT, bordercolor=BORDER, rowheight=24)
-		style.configure("Treeview.Heading", background=APP_BG, foreground=MUTED,
-			bordercolor=BORDER)
+			foreground=TEXT, bordercolor=CARD_BORDER, lightcolor=CARD_BG,
+			darkcolor=CARD_BG, borderwidth=1, relief="solid", rowheight=30,
+			font=BASE_FONT)
+		style.configure("Treeview.Heading", background=HEADING_BG,
+			foreground=MUTED, font=BOLD_FONT, relief="flat", borderwidth=0,
+			bordercolor=CARD_BORDER, lightcolor=HEADING_BG, darkcolor=HEADING_BG,
+			padding=(10, 8))
+		style.map("Treeview.Heading", background=[("active", HEADING_BG)])
 		style.map("Treeview",
-			background=[("selected", ACCENT)],
-			foreground=[("selected", "#ffffff")])
+			background=[("selected", ACCENT_SOFT)],
+			foreground=[("selected", TEXT)])
 
-		style.configure("Vertical.TScrollbar", background=BORDER, troughcolor=APP_BG,
-			bordercolor=APP_BG, arrowcolor=MUTED, relief="flat")
+		style.configure("Vertical.TScrollbar", background=SCROLL_THUMB,
+			troughcolor=CARD_BG, bordercolor=CARD_BG, arrowcolor=MUTED,
+			lightcolor=SCROLL_THUMB, darkcolor=SCROLL_THUMB, relief="flat",
+			width=11)
+		style.map("Vertical.TScrollbar",
+			background=[("active", SCROLL_HOVER), ("pressed", SCROLL_HOVER)])
 
 	def _build_chrome(self) -> None:
 		"""Draw the whole window. Called again, from scratch, on a theme switch.
@@ -617,6 +718,8 @@ class ManagerApp:
 		self.views = {}
 		self.nav = {}
 		self.fields = {}
+		self._nav_hovered = None
+		self._nav_hovered = None
 
 		self.root.configure(bg=APP_BG)
 		self._configure_style()
@@ -632,7 +735,6 @@ class ManagerApp:
 		return stored if stored in PALETTES else detect_system_theme()
 
 	def _update_theme_button(self) -> None:
-		other = "Light" if self.theme == "Dark" else "Dark"
 		self.theme_button.configure(text=f"{other} mode")
 
 	def toggle_theme(self) -> None:
@@ -679,7 +781,7 @@ class ManagerApp:
 		header = tk.Frame(self.root, bg=HEADER_BG)
 		header.pack(fill="x", side="top")
 
-		inner = tk.Frame(header, bg=HEADER_BG, padx=22, pady=16)
+		inner = tk.Frame(header, bg=HEADER_BG, padx=24, pady=18)
 		inner.pack(fill="x")
 
 		titles = tk.Frame(inner, bg=HEADER_BG)
@@ -688,23 +790,46 @@ class ManagerApp:
 		tk.Label(titles, text="Rewards Farmer", bg=HEADER_BG, fg=TEXT,
 			font=TITLE_FONT).pack(anchor="w")
 		tk.Label(titles, text="Microsoft Rewards automation manager", bg=HEADER_BG,
-			fg=MUTED, font=BASE_FONT).pack(anchor="w")
-
-		self.status_label = tk.Label(inner, text="Idle", bg=HEADER_BG, fg=MUTED,
-			font=BASE_FONT)
-		self.status_label.pack(side="right", anchor="e")
-
-		self.status_dot = tk.Canvas(inner, width=12, height=12, bg=HEADER_BG,
-			highlightthickness=0)
-		self.status_dot.pack(side="right", anchor="e", padx=(0, 8))
-		self.status_dot_id = self.status_dot.create_oval(2, 2, 10, 10, fill=IDLE, outline="")
+			fg=MUTED, font=SUBTITLE_FONT).pack(anchor="w", pady=(3, 0))
 
 		self.theme_button = ttk.Button(inner, style="Header.TButton",
 			command=self.toggle_theme)
-		self.theme_button.pack(side="right", anchor="e", padx=(0, 18))
+		self.theme_button.pack(side="right", anchor="e")
 		self._update_theme_button()
 
+		self.status_canvas = tk.Canvas(inner, height=28, bg=HEADER_BG,
+			highlightthickness=0, bd=0)
+		self.status_canvas.pack(side="right", anchor="e", padx=(0, 14))
+		self._draw_status()
+
 		tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", side="top")
+
+	def _draw_status(self) -> None:
+		"""The dot-and-label pill in the header.
+
+		Drawn on a canvas because a rounded background is the point, and a
+		`tk.Label` has no rounded corners. The width follows the text so the
+		pill hugs it whatever the status says.
+		"""
+
+		canvas = self.status_canvas
+		canvas.delete("all")
+
+		kind, text = self._status or ("idle", "Idle")
+		colors = {"running": ACCENT, "success": SUCCESS, "error": DANGER,
+			"idle": IDLE}
+		color = colors.get(kind, IDLE)
+
+		font = tkfont.Font(font=BASE_FONT)
+		padding, dot, gap = 12, 8, 8
+		width = padding + dot + gap + font.measure(text) + padding
+		canvas.configure(width=width)
+
+		_round_rect(canvas, 1, 2, width - 1, 26, 12, fill=PILL_BG, outline="")
+		canvas.create_oval(padding, 11, padding + dot, 11 + dot, fill=color,
+			outline="")
+		canvas.create_text(padding + dot + gap, 14, text=text, anchor="w",
+			fill=TEXT, font=BASE_FONT)
 
 	def _build_status_bar(self) -> None:
 		tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", side="bottom")
@@ -713,24 +838,27 @@ class ManagerApp:
 		bar.pack(fill="x", side="bottom")
 
 		self.footer_label = tk.Label(bar, text="Ready", bg=HEADER_BG, fg=MUTED,
-			font=("Segoe UI", 9), padx=22, pady=6, anchor="w")
+			font=SMALL_FONT, padx=24, pady=7, anchor="w")
 		self.footer_label.pack(side="left")
 
-		tk.Label(bar, text=".env", bg=HEADER_BG, fg=IDLE, font=("Segoe UI", 9),
-			padx=22, pady=6).pack(side="right")
+		tk.Label(bar, text=".env", bg=HEADER_BG, fg=IDLE, font=SMALL_FONT,
+			padx=24, pady=7).pack(side="right")
 
 	def _build_body(self) -> None:
 		body = tk.Frame(self.root, bg=APP_BG)
 		body.pack(fill="both", expand=True)
 
-		sidebar = tk.Frame(body, bg=SIDEBAR_BG, width=208)
+		sidebar = tk.Frame(body, bg=SIDEBAR_BG, width=216)
 		sidebar.pack(side="left", fill="y")
 		sidebar.pack_propagate(False)
 
 		tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
 
+		tk.Label(sidebar, text="MENU", bg=SIDEBAR_BG, fg=IDLE, anchor="w",
+			font=(FONT_FAMILY, 8, "bold"), padx=24).pack(fill="x", pady=(20, 8))
+
 		nav = tk.Frame(sidebar, bg=SIDEBAR_BG)
-		nav.pack(fill="x", pady=(14, 0))
+		nav.pack(fill="x")
 
 		content = tk.Frame(body, bg=APP_BG)
 		content.pack(side="left", fill="both", expand=True)
@@ -756,50 +884,68 @@ class ManagerApp:
 	# region navigation
 
 	def _add_nav_item(self, parent: tk.Frame, name: str) -> None:
-		item = tk.Frame(parent, bg=SIDEBAR_BG, cursor="hand2")
-		item.pack(fill="x", padx=8, pady=1)
+		# A canvas per entry, so the highlight can be a rounded pill rather
+		# than the square block a coloured frame gives.
+		item = tk.Canvas(parent, bg=SIDEBAR_BG, height=NAV_HEIGHT,
+			highlightthickness=0, bd=0, cursor="hand2")
+		item.pack(fill="x", padx=10)
 
-		indicator = tk.Frame(item, bg=SIDEBAR_BG, width=3)
-		indicator.pack(side="left", fill="y")
+		self.nav[name] = item
 
-		label = tk.Label(item, text=name, bg=SIDEBAR_BG, fg=MUTED, anchor="w",
-			font=BASE_FONT, padx=14, pady=9, cursor="hand2")
-		label.pack(side="left", fill="x", expand=True)
+		item.bind("<Configure>", lambda _event, n=name: self._draw_nav_item(n))
+		item.bind("<Button-1>", lambda _event, n=name: self._show_view(n))
+		item.bind("<Enter>", lambda _event, n=name: self._nav_hover(n, True))
+		item.bind("<Leave>", lambda _event, n=name: self._nav_hover(n, False))
 
-		self.nav[name] = (item, indicator, label)
+	def _draw_nav_item(self, name: str) -> None:
+		canvas = self.nav[name]
+		canvas.delete("all")
 
-		for widget in (item, label):
-			widget.bind("<Button-1>", lambda _event, n=name: self._show_view(n))
-			widget.bind("<Enter>", lambda _event, n=name: self._nav_hover(n, True))
-			widget.bind("<Leave>",
-				lambda event, n=name: self._nav_hover(n, False, event))
+		width = canvas.winfo_width()
+		if width < 2:
+			width = 196
 
-	def _nav_hover(self, name: str, entering: bool, event=None) -> None:
-		if name == self.current_view:
-			return
+		height = NAV_HEIGHT
+		selected = name == self.current_view
+		hovered = self._nav_hovered == name
 
-		# Moving onto the label or the indicator counts as leaving the frame,
-		# which would flicker the highlight back off. Ignore those.
-		if not entering and event is not None and event.detail == "NotifyInferior":
-			return
+		if selected or hovered:
+			_round_rect(canvas, 1, 3, width - 1, height - 3, 9,
+				fill=NAV_SELECTED if selected else NAV_HOVER, outline="")
 
-		background = NAV_HOVER if entering else SIDEBAR_BG
-		item, _indicator, label = self.nav[name]
-		item.configure(bg=background)
-		label.configure(bg=background)
+		color = ACCENT if selected else (TEXT if hovered else MUTED)
+		self._draw_nav_icon(canvas, name, 22, height / 2, color)
+		canvas.create_text(46, height / 2, text=name, anchor="w", fill=color,
+			font=BOLD_FONT if selected else BASE_FONT)
+
+	def _draw_nav_icon(self, canvas: tk.Canvas, name: str, cx: float, cy: float,
+		color: str) -> None:
+		"""A small glyph per page, drawn rather than shipped as an image."""
+
+		if name == "Run":
+			canvas.create_polygon(cx - 4, cy - 7, cx - 4, cy + 7, cx + 7, cy,
+				fill=color, outline="")
+		elif name == "Accounts":
+			canvas.create_oval(cx - 4, cy - 8, cx + 4, cy, fill=color, outline="")
+			canvas.create_arc(cx - 8, cy - 1, cx + 8, cy + 15, start=0, extent=180,
+				style="chord", fill=color, outline="")
+		else:
+			for offset, knob in ((-6, 3), (0, -3), (6, 4)):
+				canvas.create_line(cx - 7, cy + offset, cx + 7, cy + offset,
+					fill=color, width=2)
+				canvas.create_oval(cx + knob - 3, cy + offset - 3, cx + knob + 3,
+					cy + offset + 3, fill=color, outline="")
+
+	def _nav_hover(self, name: str, entering: bool) -> None:
+		self._nav_hovered = name if entering else None
+		self._draw_nav_item(name)
 
 	def _show_view(self, name: str) -> None:
 		self.current_view = name
 		self.views[name].tkraise()
 
-		for other, (item, indicator, label) in self.nav.items():
-			selected = other == name
-			background = NAV_SELECTED if selected else SIDEBAR_BG
-
-			item.configure(bg=background)
-			indicator.configure(bg=ACCENT if selected else SIDEBAR_BG)
-			label.configure(bg=background, fg=ACCENT if selected else MUTED,
-				font=BOLD_FONT if selected else BASE_FONT)
+		for other in self.nav:
+			self._draw_nav_item(other)
 
 	# endregion
 
@@ -809,40 +955,41 @@ class ManagerApp:
 		tab.columnconfigure(0, weight=1)
 		tab.rowconfigure(1, weight=1)
 
-		card = ttk.Frame(tab, style="Card.TFrame", padding=16)
-		card.grid(row=0, column=0, sticky="ew", pady=(18, 0), padx=18)
-		card.columnconfigure(0, weight=1)
+		summary = _card(tab)
+		summary.grid(row=0, column=0, sticky="ew", pady=(PAGE_PAD, 0), padx=PAGE_PAD)
+		summary.columnconfigure(0, weight=1)
 
-		left = ttk.Frame(card, style="Card.TFrame")
+		left = tk.Frame(summary, bg=CARD_BG)
 		left.grid(row=0, column=0, sticky="w")
 
-		ttk.Label(left, text="Accounts to run", style="CardMuted.TLabel").grid(
+		ttk.Label(left, text="Ready to run", style="H1.TLabel").grid(
 			row=0, column=0, sticky="w")
-		self.run_accounts_label = ttk.Label(left, text="-", style="Value.TLabel",
-			wraplength=520, justify="left")
-		self.run_accounts_label.grid(row=1, column=0, sticky="w", pady=(2, 0))
-		self.run_excluded_label = ttk.Label(left, text="", style="CardMuted.TLabel",
-			wraplength=520, justify="left")
-		self.run_excluded_label.grid(row=2, column=0, sticky="w", pady=(2, 0))
+		self.run_accounts_label = ttk.Label(left, text="-", style="Headline.TLabel",
+			wraplength=560, justify="left")
+		self.run_accounts_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
+		self.run_excluded_label = ttk.Label(left, text="", style="CardSmall.TLabel",
+			wraplength=560, justify="left")
+		self.run_excluded_label.grid(row=2, column=0, sticky="w", pady=(4, 0))
 
-		actions = ttk.Frame(card, style="Card.TFrame")
-		actions.grid(row=0, column=1, sticky="e")
+		actions = tk.Frame(summary, bg=CARD_BG)
+		actions.grid(row=0, column=1, sticky="e", padx=(GAP, 0))
 
 		self.run_button = ttk.Button(actions, text="Run", style="Accent.TButton",
-			command=self.start_run, width=10)
+			command=self.start_run)
 		self.run_button.grid(row=0, column=0, padx=(0, 8))
 
 		self.stop_button = ttk.Button(actions, text="Stop", command=self.stop_run,
-			state="disabled", width=10)
+			state="disabled")
 		self.stop_button.grid(row=0, column=1)
 
-		console_card = ttk.Frame(tab, style="Card.TFrame", padding=(16, 12, 16, 16))
-		console_card.grid(row=1, column=0, sticky="nsew", pady=(12, 18), padx=18)
+		console_card = _card(tab, pady=16)
+		console_card.grid(row=1, column=0, sticky="nsew",
+			pady=(GAP, PAGE_PAD), padx=PAGE_PAD)
 		console_card.columnconfigure(0, weight=1)
 		console_card.rowconfigure(1, weight=1)
 
-		head = ttk.Frame(console_card, style="Card.TFrame")
-		head.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+		head = tk.Frame(console_card, bg=CARD_BG)
+		head.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 		head.columnconfigure(0, weight=1)
 
 		ttk.Label(head, text="Output", style="H1.TLabel").grid(row=0, column=0, sticky="w")
@@ -851,14 +998,16 @@ class ManagerApp:
 
 		self.console = tk.Text(console_card, bg=CONSOLE_BG, fg=CONSOLE_FG, bd=0,
 			relief="flat", wrap="word", font=MONO_FONT, padx=12, pady=10,
-			highlightthickness=0, insertbackground=CONSOLE_FG, state="disabled")
+			highlightthickness=1, highlightbackground=CONSOLE_BORDER,
+			highlightcolor=CONSOLE_BORDER, insertbackground=CONSOLE_FG,
+			state="disabled", spacing1=1, spacing3=1)
 
 		scrollbar = ttk.Scrollbar(console_card, orient="vertical",
 			command=self.console.yview)
 		self.console.configure(yscrollcommand=scrollbar.set)
 
 		self.console.grid(row=1, column=0, sticky="nsew")
-		scrollbar.grid(row=1, column=1, sticky="ns")
+		scrollbar.grid(row=1, column=1, sticky="ns", padx=(8, 0))
 
 		self.console.tag_configure("error", foreground=CONSOLE_ERROR)
 		self.console.tag_configure("warning", foreground=CONSOLE_WARNING)
@@ -873,27 +1022,25 @@ class ManagerApp:
 		tab.columnconfigure(0, weight=1)
 		tab.rowconfigure(0, weight=1)
 
-		card = ttk.Frame(tab, style="Card.TFrame", padding=16)
-		card.grid(row=0, column=0, sticky="nsew", pady=(18, 18), padx=18)
+		card = _card(tab)
+		card.grid(row=0, column=0, sticky="nsew", pady=PAGE_PAD, padx=PAGE_PAD)
 		card.columnconfigure(0, weight=1)
 		card.rowconfigure(2, weight=1)
 
-		head = ttk.Frame(card, style="Card.TFrame")
-		head.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+		head = tk.Frame(card, bg=CARD_BG)
+		head.grid(row=0, column=0, columnspan=2, sticky="ew")
 		head.columnconfigure(0, weight=1)
 
 		ttk.Label(head, text="Accounts", style="H1.TLabel").grid(row=0, column=0, sticky="w")
 		self.accounts_count_label = ttk.Label(head, text="", style="CardMuted.TLabel")
 		self.accounts_count_label.grid(row=0, column=1, sticky="e")
 
-		ttk.Label(card, style="CardMuted.TLabel", wraplength=660, justify="left",
+		ttk.Label(card, style="CardSmall.TLabel", wraplength=680, justify="left",
 			text="Each account is its own browser profile under the data directory. "
 			     "The second column is the Microsoft account that profile is signed "
-			     "into - the one a run actually farms. Every account runs by default; "
-			     "select rows and Exclude the ones you want left out. Double-clicking "
-			     "a row flips it. Sign in once per profile, then a run works through "
-			     "the rest in order.").grid(
-			row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
+			     "into. Every account runs by default; select rows and Exclude the "
+			     "ones you want left out.").grid(
+			row=1, column=0, columnspan=2, sticky="w", pady=(6, 10))
 
 		self.accounts_tree = ttk.Treeview(card, columns=("name", "email", "run"),
 			show="headings", selectmode="extended", height=10)
@@ -901,10 +1048,12 @@ class ManagerApp:
 		self.accounts_tree.heading("email", text="Signed in as")
 		self.accounts_tree.heading("run", text="Run")
 		self.accounts_tree.column("name", anchor="w", width=200, stretch=False)
-		self.accounts_tree.column("email", anchor="w", width=320)
-		self.accounts_tree.column("run", anchor="w", width=80, stretch=False)
-		# An excluded row stays readable but recedes, so the farming set is
-		# obvious at a glance.
+		self.accounts_tree.column("email", anchor="w", width=340)
+		self.accounts_tree.column("run", anchor="center", width=90, stretch=False)
+		# Zebra stripes keep a long list readable, and an excluded row recedes
+		# so the farming set is obvious at a glance.
+		self.accounts_tree.tag_configure("odd", background=ROW_ALT)
+		self.accounts_tree.tag_configure("even", background=CARD_BG)
 		self.accounts_tree.tag_configure("skipped", foreground=MUTED)
 		self.accounts_tree.grid(row=2, column=0, sticky="nsew")
 		self.accounts_tree.bind("<Double-1>", self._toggle_row)
@@ -913,10 +1062,14 @@ class ManagerApp:
 		tree_scroll = ttk.Scrollbar(card, orient="vertical",
 			command=self.accounts_tree.yview)
 		self.accounts_tree.configure(yscrollcommand=tree_scroll.set)
-		tree_scroll.grid(row=2, column=1, sticky="ns")
+		tree_scroll.grid(row=2, column=1, sticky="ns", padx=(8, 0))
 
-		add_row = ttk.Frame(card, style="Card.TFrame")
-		add_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+		ttk.Label(card, style="CardSmall.TLabel",
+			text="Tip: double-click a row to include or exclude it.").grid(
+			row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+		add_row = tk.Frame(card, bg=CARD_BG)
+		add_row.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(12, 0))
 		add_row.columnconfigure(1, weight=1)
 
 		ttk.Label(add_row, text="New profile", style="Card.TLabel").grid(
@@ -926,26 +1079,26 @@ class ManagerApp:
 		entry.grid(row=0, column=1, sticky="ew")
 		entry.bind("<Return>", lambda _event: self.add_account())
 		ttk.Button(add_row, text="Add", style="Accent.TButton",
-			command=self.add_account, width=8).grid(row=0, column=2, padx=(8, 0))
+			command=self.add_account).grid(row=0, column=2, padx=(8, 0))
 		ttk.Button(add_row, text="Add many...", style="Ghost.TButton",
-			command=self.add_accounts_dialog, width=12).grid(row=0, column=3, padx=(8, 0))
+			command=self.add_accounts_dialog).grid(row=0, column=3, padx=(8, 0))
 
-		action_row = ttk.Frame(card, style="Card.TFrame")
-		action_row.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+		action_row = tk.Frame(card, bg=CARD_BG)
+		action_row.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(12, 0))
 		action_row.columnconfigure(3, weight=1)
 
 		ttk.Button(action_row, text="Select all", style="Ghost.TButton",
-			command=self.select_all_accounts, width=10).grid(row=0, column=0, padx=(0, 8))
+			command=self.select_all_accounts).grid(row=0, column=0, padx=(0, 8))
 		ttk.Button(action_row, text="Include", style="Ghost.TButton",
-			command=self.include_accounts, width=9).grid(row=0, column=1, padx=(0, 8))
+			command=self.include_accounts).grid(row=0, column=1, padx=(0, 8))
 		ttk.Button(action_row, text="Exclude", style="Ghost.TButton",
-			command=self.exclude_accounts, width=9).grid(row=0, column=2)
+			command=self.exclude_accounts).grid(row=0, column=2)
 
 		self.signin_button = ttk.Button(action_row, text="Sign in", style="Ghost.TButton",
-			command=self.sign_in, width=10)
+			command=self.sign_in)
 		self.signin_button.grid(row=0, column=4, padx=(8, 8))
-		self.remove_button = ttk.Button(action_row, text="Remove", style="Ghost.TButton",
-			command=self.remove_accounts, width=10)
+		self.remove_button = ttk.Button(action_row, text="Remove", style="Danger.TButton",
+			command=self.remove_accounts)
 		self.remove_button.grid(row=0, column=5)
 
 	# endregion
@@ -956,39 +1109,40 @@ class ManagerApp:
 		tab.columnconfigure(0, weight=1)
 		tab.rowconfigure(0, weight=1)
 
-		card = ttk.Frame(tab, style="Card.TFrame", padding=(16, 16, 16, 0))
-		card.grid(row=0, column=0, sticky="nsew", pady=(18, 18), padx=18)
+		card = _card(tab)
+		card.grid(row=0, column=0, sticky="nsew", pady=PAGE_PAD, padx=PAGE_PAD)
 		card.columnconfigure(0, weight=1)
 		card.rowconfigure(1, weight=1)
 
-		head = ttk.Frame(card, style="Card.TFrame")
-		head.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+		head = tk.Frame(card, bg=CARD_BG)
+		head.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 		ttk.Label(head, text="Settings", style="H1.TLabel").pack(side="left")
-		ttk.Label(head, text="  stored in .env", style="CardMuted.TLabel").pack(side="left")
+		ttk.Label(head, text="stored in .env", style="CardSmall.TLabel").pack(
+			side="left", padx=(8, 0))
 
 		body = self._scrollable(card)
 
 		for section in SETTINGS:
 			self._build_section(body, section)
 
-		actions = ttk.Frame(card, style="Card.TFrame", padding=(0, 12))
-		actions.grid(row=2, column=0, sticky="ew")
+		actions = tk.Frame(card, bg=CARD_BG)
+		actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(14, 0))
 		actions.columnconfigure(0, weight=1)
 
 		ttk.Button(actions, text="Reload from .env", style="Ghost.TButton",
 			command=self.load_settings).grid(row=0, column=0, sticky="w")
 		ttk.Button(actions, text="Save", style="Accent.TButton",
-			command=self.save_settings, width=12).grid(row=0, column=1, sticky="e")
+			command=self.save_settings).grid(row=0, column=1, sticky="e")
 
-	def _scrollable(self, parent: ttk.Frame) -> ttk.Frame:
+	def _scrollable(self, parent: tk.Frame) -> tk.Frame:
 		canvas = tk.Canvas(parent, bg=CARD_BG, highlightthickness=0, bd=0)
 		scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
 		canvas.configure(yscrollcommand=scrollbar.set)
 
 		canvas.grid(row=1, column=0, sticky="nsew")
-		scrollbar.grid(row=1, column=1, sticky="ns")
+		scrollbar.grid(row=1, column=1, sticky="ns", padx=(8, 0))
 
-		inner = ttk.Frame(canvas, style="Card.TFrame")
+		inner = tk.Frame(canvas, bg=CARD_BG)
 		window = canvas.create_window((0, 0), window=inner, anchor="nw")
 
 		inner.bind("<Configure>",
@@ -1006,32 +1160,32 @@ class ManagerApp:
 
 		return inner
 
-	def _build_section(self, parent: ttk.Frame, section: Section) -> None:
-		block = ttk.Frame(parent, style="Card.TFrame", padding=(0, 6))
+	def _build_section(self, parent: tk.Frame, section: Section) -> None:
+		block = tk.Frame(parent, bg=CARD_BG)
 		block.pack(fill="x")
 		block.columnconfigure(1, weight=1)
 
 		ttk.Label(block, text=section.title, style="H1.TLabel").grid(
-			row=0, column=0, columnspan=3, sticky="w", pady=(4, 2))
+			row=0, column=0, columnspan=3, sticky="w", pady=(12, 4))
 
 		for index, spec in enumerate(section.fields, start=1):
 			self._build_field(block, index, spec)
 
 		separator = tk.Frame(block, bg=BORDER, height=1)
 		separator.grid(row=len(section.fields) + 1, column=0, columnspan=3,
-			sticky="ew", pady=(12, 2))
+			sticky="ew", pady=(12, 0))
 
-	def _build_field(self, parent: ttk.Frame, row: int, spec: Field) -> None:
+	def _build_field(self, parent: tk.Frame, row: int, spec: Field) -> None:
 		ttk.Label(parent, text=spec.label, style="Card.TLabel").grid(
-			row=row, column=0, sticky="w", padx=(0, 16), pady=5)
+			row=row, column=0, sticky="w", padx=(0, 20), pady=7)
 
 		current = self.env.get(spec.key, spec.default)
 
 		if spec.kind == "bool":
 			var = tk.BooleanVar(value=_to_bool(current))
 
-			holder = ttk.Frame(parent, style="Card.TFrame")
-			holder.grid(row=row, column=1, sticky="w", pady=5)
+			holder = tk.Frame(parent, bg=CARD_BG)
+			holder.grid(row=row, column=1, sticky="w", pady=7)
 
 			ToggleSwitch(holder, var).pack(side="left")
 
@@ -1039,7 +1193,9 @@ class ManagerApp:
 			state_label.pack(side="left", padx=(10, 0))
 
 			def sync_state(*_args, var=var, state_label=state_label):
-				state_label.configure(text="On" if var.get() else "Off")
+				on = var.get()
+				state_label.configure(text="On" if on else "Off",
+					foreground=SUCCESS if on else MUTED)
 
 			var.trace_add("write", sync_state)
 			sync_state()
@@ -1050,8 +1206,8 @@ class ManagerApp:
 		elif spec.kind == "choice":
 			var = tk.StringVar(value=current if current in spec.choices else spec.default)
 			widget = ttk.Combobox(parent, textvariable=var, values=list(spec.choices),
-				state="readonly", width=26)
-			widget.grid(row=row, column=1, sticky="w", pady=5)
+				state="readonly", width=28)
+			widget.grid(row=row, column=1, sticky="w", pady=7)
 			getter = lambda var=var, default=spec.default: var.get() or default
 			setter = lambda value, var=var, choices=spec.choices, default=spec.default: var.set(
 				value if value in choices else default)
@@ -1059,14 +1215,14 @@ class ManagerApp:
 		else:
 			var = tk.StringVar(value=current)
 			widget = ttk.Entry(parent, textvariable=var)
-			widget.grid(row=row, column=1, sticky="ew", pady=5)
+			widget.grid(row=row, column=1, sticky="ew", pady=7)
 			getter = lambda var=var: var.get().strip()
 			setter = lambda value, var=var: var.set(value)
 
 			if spec.browse:
 				mode = spec.browse
 				button = ttk.Button(parent, text="Browse", style="Ghost.TButton",
-					width=9, command=lambda var=var, mode=mode: self._browse(var, mode))
+					command=lambda var=var, mode=mode: self._browse(var, mode))
 				button.grid(row=row, column=2, sticky="e", padx=(8, 0))
 
 		self.fields[spec.key] = (getter, setter, spec)
@@ -1138,11 +1294,15 @@ class ManagerApp:
 		for item in self.accounts_tree.get_children():
 			self.accounts_tree.delete(item)
 
-		for name in self.accounts:
+		for index, name in enumerate(self.accounts):
 			skipped = name in self.excluded
+			tags = ["odd" if index % 2 else "even"]
+			if skipped:
+				tags.append("skipped")
+
 			self.accounts_tree.insert("", "end",
 				values=(name, self._profile_email(name), "Skipped" if skipped else "Farms"),
-				tags=("skipped",) if skipped else ())
+				tags=tuple(tags))
 
 		self.farming = [name for name in self.accounts if name not in self.excluded]
 		self._refresh_run_label()
@@ -1169,18 +1329,30 @@ class ManagerApp:
 	def _refresh_run_label(self) -> None:
 		if not self.accounts:
 			self.run_accounts_label.configure(text="(default profile)")
-			self.run_excluded_label.configure(text="The default profile will run.")
+			self.run_excluded_label.configure(
+				text="No accounts configured; the default profile will run.")
 			return
 
-		self.run_accounts_label.configure(
-			text=", ".join(self.farming) if self.farming else "(nothing selected)")
+		total = len(self.accounts)
+		running = len(self.farming)
+		plural = "" if total == 1 else "s"
 
-		if self._skipped:
-			self.run_excluded_label.configure(
-				text=f"{len(self.farming)} of {len(self.accounts)} will run. "
-				     f"Excluded: {', '.join(self._skipped)}.")
+		if running:
+			self.run_accounts_label.configure(
+				text=f"{running} of {total} account{plural} will run")
 		else:
-			self.run_excluded_label.configure(text=f"All {len(self.accounts)} will run.")
+			self.run_accounts_label.configure(text="Nothing selected to run")
+
+		lines: list[str] = []
+
+		if self.farming:
+			lines.append("Farming: " + ", ".join(self.farming))
+		if self._skipped:
+			lines.append("Excluded: " + ", ".join(self._skipped))
+		if not self.farming:
+			lines.append("Every account is excluded. Include one to run.")
+
+		self.run_excluded_label.configure(text="\n".join(lines))
 
 	def _refresh_accounts_count(self) -> None:
 		count = len(self.accounts)
@@ -1216,24 +1388,24 @@ class ManagerApp:
 		dialog.configure(bg=CARD_BG)
 		dialog.transient(self.root)
 
-		wrapper = tk.Frame(dialog, bg=CARD_BG, padx=16, pady=14)
+		wrapper = tk.Frame(dialog, bg=CARD_BG, padx=20, pady=18)
 		wrapper.pack(fill="both", expand=True)
 
 		tk.Label(wrapper, text="One profile name per line", bg=CARD_BG, fg=TEXT,
 			font=BOLD_FONT).pack(anchor="w")
-		tk.Label(wrapper, bg=CARD_BG, fg=MUTED, font=BASE_FONT, justify="left",
+		tk.Label(wrapper, bg=CARD_BG, fg=MUTED, font=SMALL_FONT, justify="left",
 			text="Letters, digits, dot, dash or underscore. Commas and blank "
-			     "lines are fine too; duplicates are skipped.").pack(anchor="w", pady=(2, 8))
+			     "lines are fine too; duplicates are skipped.").pack(anchor="w", pady=(4, 10))
 
 		text = tk.Text(wrapper, width=44, height=12, bg=INPUT_BG, fg=TEXT,
 			insertbackground=TEXT, bd=0, highlightthickness=1,
-			highlightbackground=BORDER, highlightcolor=ACCENT, font=BASE_FONT,
-			padx=8, pady=6, wrap="none")
+			highlightbackground=INPUT_BORDER, highlightcolor=ACCENT, font=BASE_FONT,
+			padx=10, pady=8, wrap="none")
 		text.pack(fill="both", expand=True)
 		text.focus_set()
 
 		buttons = tk.Frame(wrapper, bg=CARD_BG)
-		buttons.pack(fill="x", pady=(10, 0))
+		buttons.pack(fill="x", pady=(12, 0))
 
 		def submit():
 			names = split_account_names(text.get("1.0", "end"))
@@ -1241,10 +1413,9 @@ class ManagerApp:
 			if names:
 				self._add_names(names)
 
-		ttk.Button(buttons, text="Add", style="Accent.TButton", command=submit,
-			width=10).pack(side="right")
+		ttk.Button(buttons, text="Add", style="Accent.TButton", command=submit).pack(side="right")
 		ttk.Button(buttons, text="Cancel", style="Ghost.TButton",
-			command=dialog.destroy, width=10).pack(side="right", padx=(0, 8))
+			command=dialog.destroy).pack(side="right", padx=(0, 8))
 
 		dialog.bind("<Escape>", lambda _event: dialog.destroy())
 		dialog.update_idletasks()
@@ -1626,9 +1797,7 @@ class ManagerApp:
 
 	def set_status(self, kind: str, text: str) -> None:
 		self._status = (kind, text)
-		colors = {"running": ACCENT, "success": SUCCESS, "error": DANGER, "idle": IDLE}
-		self.status_dot.itemconfigure(self.status_dot_id, fill=colors.get(kind, IDLE))
-		self.status_label.configure(text=text)
+		self._draw_status()
 
 	def set_footer(self, text: str) -> None:
 		self.footer_label.configure(text=text)
@@ -1689,7 +1858,19 @@ class ManagerApp:
 	# endregion
 
 
+def _enable_dpi_awareness() -> None:
+	"""Ask Windows for crisp text; harmless where the call is missing."""
+	if sys.platform != "win32":
+		return
+	try:
+		import ctypes
+		ctypes.windll.shcore.SetProcessDpiAwareness(1)
+	except Exception:
+		pass
+
+
 def main() -> int:
+	_enable_dpi_awareness()
 	root = tk.Tk()
 	ManagerApp(root)
 	root.mainloop()
